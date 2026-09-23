@@ -1,0 +1,16 @@
+[project]
+name = "autotune-policy-random-search"
+version = "0.1.0"
+description = "Reference random-search policy for LLM AutoTune, and the fork-and-edit template for new policies."
+requires-python = ">=3.10"
+dependencies = []  # the SDK is stdlib-only on purpose
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
