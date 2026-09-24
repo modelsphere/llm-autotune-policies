@@ -102,8 +102,8 @@ freely.
 The image is stdlib-only, so there's nothing to install:
 
 ```bash
-docker build -t <registry>/autotune-policy-random-search:0.1.0 .
-docker push  <registry>/autotune-policy-random-search:0.1.0
+docker build -t <registry>/llm-autotune-policy-random-search:0.1.0 .
+docker push  <registry>/llm-autotune-policy-random-search:0.1.0
 ```
 
 Register it as a policy on the platform (name + image), then start a campaign

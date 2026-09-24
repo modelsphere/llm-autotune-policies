@@ -49,13 +49,18 @@ Each policy vendors the SDK, so its own directory is the build context and there
 is nothing to install:
 
 ```bash
-docker build -t my-policy:0.1.0 random-search/
+docker build -t <registry>/llm-autotune-policy-random-search:0.1.0 random-search/
+docker push <registry>/llm-autotune-policy-random-search:0.1.0
 ```
 
+No image is published from this repository; the policy runs from the one you
+build, so put it where your GPU machines can pull it. Without a registry: on an
+ssh machine, `docker save … | ssh <host> docker load`; on kind,
+`kind load docker-image …`. Use a version tag rather than `latest`, so
+Kubernetes runs the loaded image instead of trying to pull.
+
 Then register the image on the platform's Policies page and name it from a
-campaign. Tagged releases of this repository (`v*`) publish both policies as
-`ghcr.io/modelsphere/autotune-policy-random-search` and
-`ghcr.io/modelsphere/autotune-policy-chaos`.
+campaign.
 
 ## License
 

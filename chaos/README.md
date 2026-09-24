@@ -40,8 +40,8 @@ Tunable via env (all optional): `CHAOS_BEATS`, `CHAOS_INTERVAL_S` (idle),
 1. **Build & push** to a registry the GPU machines can pull from. The image is
    stdlib-only, so there is nothing to install:
    ```bash
-   docker build -t <registry>/autotune-policy-chaos:0.1.0 .
-   docker push <registry>/autotune-policy-chaos:0.1.0
+   docker build -t <registry>/llm-autotune-policy-chaos:0.1.0 .
+   docker push <registry>/llm-autotune-policy-chaos:0.1.0
    ```
 2. **Register** it as a policy (name + image), with `env` carrying the scenario —
    e.g. `{"CHAOS_SCENARIO": "idle"}`. Register it once per fault you want on tap,
