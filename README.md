@@ -59,8 +59,18 @@ ssh machine, `docker save … | ssh <host> docker load`; on kind,
 `kind load docker-image …`. Use a version tag rather than `latest`, so
 Kubernetes runs the loaded image instead of trying to pull.
 
-Then register the image on the platform's Policies page and name it from a
-campaign.
+Then register the image with the platform's API (an API key from its API Keys
+page) and pick it as a campaign's policy in the New campaign form:
+
+```bash
+curl -X POST https://<autotune>/api/policies -H "X-API-Key: $KEY" \
+  -H 'Content-Type: application/json' -d '{"name": "random-search",
+    "image": "<registry>/llm-autotune-policy-random-search:0.1.0", "version": "0.1.0",
+    "gpus_in_container": false, "needs_model": false}'
+```
+
+`gpus_in_container` and `needs_model` are false for a policy that only
+delegates launches to the platform, as both policies here do.
 
 ## License
 
