@@ -1,0 +1,16 @@
+LLM AutoTune policies
+Copyright (c) 2026 the ModelSphere authors
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+The policy SDK (autotune_policy/, vendored into each policy) and the policies
+use only the Python standard library (Python Software Foundation License);
+nothing else is installed into a policy image.
+
+Development tools (not shipped in an image)
+  pytest ............................ MIT
+  Ruff .............................. MIT
+
+Container base image
+  docker.io/library/python (python:3.12-slim unless the BASE build arg
+  overrides it) — see the image's own licenses.
