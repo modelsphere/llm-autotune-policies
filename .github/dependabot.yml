@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # Each policy is its own uv project. Only the dev tools (pytest, ruff) are
+  # locked there: the SDK and the policies are stdlib-only.
+  - package-ecosystem: uv
+    directories:
+      - /random-search
+      - /chaos
+    schedule:
+      interval: weekly
+    groups:
+      dev-tools:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+
+  # No docker entry: the Dockerfiles take their base image as a build arg
+  # (FROM ${BASE}), which Dependabot cannot follow.
