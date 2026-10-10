@@ -1,6 +1,6 @@
 [project]
 name = "autotune-policy-chaos"
-version = "0.1.0"
+version = "0.1.1"
 description = "Fault-injection policy for LLM AutoTune — emits common policy failures to test how the platform handles them."
 requires-python = ">=3.10"
 dependencies = []  # the SDK is stdlib-only on purpose

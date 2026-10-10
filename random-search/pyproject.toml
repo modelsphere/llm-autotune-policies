@@ -1,6 +1,6 @@
 [project]
 name = "autotune-policy-random-search"
-version = "0.1.0"
+version = "0.1.1"
 description = "Reference random-search policy for LLM AutoTune, and the fork-and-edit template for new policies."
 requires-python = ">=3.10"
 dependencies = []  # the SDK is stdlib-only on purpose
