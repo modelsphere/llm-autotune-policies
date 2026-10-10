@@ -6,7 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-10
+
 ### Added
+- `random-search` is published on a version tag as
+  `ghcr.io/modelsphere/llm-autotune-policy-random-search:<version>`, for
+  amd64 and arm64, so it can be registered without building it. The CI checks
+  that the tag matches the policy's version.
 - README: how to register a policy image through the platform's API
   (`POST /api/policies`) (#1).
 - CI gate for the license text and committed credentials.
@@ -37,5 +43,6 @@ First release.
   published; the README explains how to build one and get it onto a machine
   without a registry.
 
-[Unreleased]: https://github.com/modelsphere/llm-autotune-policies/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/modelsphere/llm-autotune-policies/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/modelsphere/llm-autotune-policies/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/modelsphere/llm-autotune-policies/releases/tag/v0.1.0

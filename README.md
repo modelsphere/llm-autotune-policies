@@ -43,19 +43,30 @@ describes the five methods a strategy implements. [`BEST_PRACTICES.md`](BEST_PRA
 platform enforces for you, so you can change the search logic without reasoning
 about the protocol.
 
+## Using the published image
+
+`random-search` is published with every release, for amd64 and arm64:
+
+```text
+ghcr.io/modelsphere/llm-autotune-policy-random-search:0.1.1
+```
+
+If your GPU nodes can pull from ghcr.io, register that image and skip the
+build. If they can't, copy it into a registry they can reach
+(`docker pull`, `docker tag`, `docker push`), or build it as below.
+
 ## Building an image
 
 Each policy vendors the SDK, so its own directory is the build context and there
 is nothing to install:
 
 ```bash
-docker build -t <registry>/llm-autotune-policy-random-search:0.1.0 random-search/
-docker push <registry>/llm-autotune-policy-random-search:0.1.0
+docker build -t <registry>/llm-autotune-policy-random-search:0.1.1 random-search/
+docker push <registry>/llm-autotune-policy-random-search:0.1.1
 ```
 
-No image is published from this repository; the policy runs from the one you
-build, so put it where your GPU machines can pull it. Without a registry: on an
-ssh machine, `docker save … | ssh <host> docker load`; on kind,
+Put it where your GPU machines can pull it. Without a registry: on an ssh
+machine, `docker save … | ssh <host> docker load`; on kind,
 `kind load docker-image …`. Use a version tag rather than `latest`, so
 Kubernetes runs the loaded image instead of trying to pull.
 
@@ -65,7 +76,7 @@ page) and pick it as a campaign's policy in the New campaign form:
 ```bash
 curl -X POST https://<autotune>/api/policies -H "X-API-Key: $KEY" \
   -H 'Content-Type: application/json' -d '{"name": "random-search",
-    "image": "<registry>/llm-autotune-policy-random-search:0.1.0", "version": "0.1.0",
+    "image": "ghcr.io/modelsphere/llm-autotune-policy-random-search:0.1.1", "version": "0.1.1",
     "gpus_in_container": false, "needs_model": false}'
 ```
 

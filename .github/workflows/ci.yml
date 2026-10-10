@@ -74,23 +74,57 @@ jobs:
 
   image:
     # Each policy vendors the SDK, so its own directory is the build context.
-    # Built on every push so a broken Dockerfile is caught in review. Nothing is
-    # published: a policy runs from an image its user builds and puts where their
-    # GPU machines can pull it (see README.md, "Building an image").
+    # Built on every push so a broken Dockerfile is caught in review. On a
+    # version tag, random-search is also published to ghcr.io for amd64 and
+    # arm64, so an install can register it without building anything; any
+    # policy still builds from source for a registry of your own (README.md,
+    # "Building an image").
     runs-on: ubuntu-latest
     needs: [sdk-copies-match, test]
     permissions:
       contents: read
+      packages: write
     strategy:
       matrix:
         policy: [random-search, chaos]
+    env:
+      PUBLISH: ${{ startsWith(github.ref, 'refs/tags/v') && matrix.policy == 'random-search' }}
+      IMAGE: ghcr.io/${{ github.repository_owner }}/llm-autotune-policy-${{ matrix.policy }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - id: version
+        name: The tag agrees with the policy's version
+        if: env.PUBLISH == 'true'
+        run: |
+          set -eu
+          tag="${GITHUB_REF_NAME#v}"
+          declared=$(sed -n 's/^version = "\(.*\)"$/\1/p' "${{ matrix.policy }}/pyproject.toml")
+          if [ "$tag" != "$declared" ]; then
+            echo "::error::tag $GITHUB_REF_NAME != ${{ matrix.policy }} version $declared; bump ${{ matrix.policy }}/pyproject.toml"
+            exit 1
+          fi
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+        if: env.PUBLISH == 'true'
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        if: env.PUBLISH == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ${{ matrix.policy }}
-          push: false
-          tags: llm-autotune-policy-${{ matrix.policy }}:ci
+          push: ${{ env.PUBLISH == 'true' }}
+          platforms: ${{ env.PUBLISH == 'true' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          # A version tag only, never `latest`: a campaign must re-run the same
+          # search, and nodes keep the image they already have.
+          tags: ${{ env.PUBLISH == 'true' && format('{0}:{1}', env.IMAGE, steps.version.outputs.version) || format('llm-autotune-policy-{0}:ci', matrix.policy) }}
+          # The source label links the package to this repository on ghcr.io.
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description=LLM AutoTune search policy: ${{ matrix.policy }}
+            org.opencontainers.image.licenses=Apache-2.0
