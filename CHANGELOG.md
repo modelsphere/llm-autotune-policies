@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- The SDK's search loop logs each step at INFO: the start, the plan, every
+  launch and its benchmark result, the platform's commands, and the exit. The
+  platform saves a policy container's log when the session ends; a policy that
+  logged nothing left an empty one.
+- Policy images set `PYTHONUNBUFFERED=1`, so nothing printed is lost in a buffer
+  when the platform removes the container.
+
 ## [0.1.1] - 2026-10-10
 
 ### Added
