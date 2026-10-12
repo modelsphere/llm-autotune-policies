@@ -9,7 +9,7 @@ the test that says the policy is contract-correct.
 from __future__ import annotations
 
 from autotune_policy import SearchLoop
-from strategies.random_search import RandomSearch
+from tests.random_search_fixture import RandomSearch
 
 MANIFEST = {
     "contract": {"version": "1.1"},
