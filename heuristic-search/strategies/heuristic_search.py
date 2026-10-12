@@ -1,10 +1,10 @@
-"""Workload-guided local search for Kimi K3 on a fixed, validated topology.
+"""Workload-guided local search on a fixed, validated topology.
 
 Only declared operational knobs are varied. Precision, topology, speculative
 decoding and backend selection belong in separately validated campaign recipes.
 No telemetry is inferred from an opaque objective value.
 
-Platform interface (also consumed by HeuristicSearchV2)::
+Platform interface::
 
     manifest["objective"] = {
         "screen": {"target_metric": "perf_guidellm_sweep.total_tpm_card_norm",
@@ -67,17 +67,24 @@ DEFAULTS = {"max_running_requests": 32, "chunked_prefill_size": 4096,
             "cuda_graph_max_bs_decode": 32, "schedule_conservativeness": 1.0}
 
 
-class HeuristicSearch(Strategy):
-    """Bounded coordinate search: coarse neighbors, then adjacent values.
+logger = logging.getLogger(__name__)
 
-    ``baseline`` overrides production arguments, restricted to declared keys.
-    Unknown axes use production values or their first declared row and stay
-    fixed. A tied group is tunable only if ALL its columns are supported knobs.
-    Across nights the best config is remeasured; old scores are never reused.
+
+class HeuristicSearch(Strategy):
+    """Keep feasible winners separate from an optionally infeasible search center.
+
+    Local models use measurements with identical other axes. Numeric single
+    axes use actual values; tied numeric rows use row coordinates (group effect).
+    Categorical axes are explored without linear extrapolation. Predictions only
+    prioritize experiments; measured feasibility alone admits contenders.
     """
 
+    state_strategy = "heuristic-search"
+
     def __init__(self, *, workload: str = "agent", max_trials: int = 24,
-                 min_improvement: float = 0.01, baseline: dict | None = None):
+                 min_improvement: float = 0.01, baseline: dict | None = None,
+                 safety_margin: float = 0.05, max_step: int = 4,
+                 pruning_threshold: float = 0.1, decision_log=None):
         if workload not in PROFILES:
             raise ValueError(f"unknown workload {workload!r}; choose {list(PROFILES)}")
         if max_trials < 1 or not math.isfinite(min_improvement) or min_improvement < 0:
@@ -86,6 +93,17 @@ class HeuristicSearch(Strategy):
         self.max_trials = max_trials
         self.min_improvement = min_improvement
         self.baseline = deepcopy(baseline or {})
+
+        if not math.isfinite(safety_margin) or not 0 <= safety_margin < 1:
+            raise ValueError("safety_margin must be finite and in [0, 1)")
+        if isinstance(max_step, bool) or not isinstance(max_step, int) or max_step < 1:
+            raise ValueError("max_step must be a positive integer")
+        if not self._finite(pruning_threshold) or pruning_threshold <= 0:
+            raise ValueError("pruning_threshold must be finite and positive")
+        self.safety_margin = safety_margin
+        self.max_step = max_step
+        self.pruning_threshold = pruning_threshold
+        self.decision_log = decision_log
 
     def setup(self, manifest: dict) -> None:
         self.session_id = manifest.get("session_id")
@@ -126,6 +144,28 @@ class HeuristicSearch(Strategy):
         self.reason = "baseline"
         self.done = False
         self.inflight: dict | None = None
+
+        # The campaign manifest is the single source of truth for SLOs.
+        self.constraints = self.screen_redlines
+        self.required_metrics = {spec["metric"] for spec in self.constraints}
+        # Retain the historical context envelope to accept existing V2 checkpoints.
+        self.context = canonical_key({"v1": self.context, "constraints": self.constraints,
+                                      "safety_margin": self.safety_margin,
+                                      "max_step": self.max_step})
+        # Keep default-policy checkpoints compatible: their samples can supply
+        # pruning evidence even when written before direction pruning existed.
+        if self.pruning_threshold != 0.1:
+            self.context = canonical_key({"context": self.context,
+                                          "pruning_threshold": self.pruning_threshold})
+        self.center: TrialResult | None = None
+        self.samples: list[tuple[dict, TrialResult]] = []
+        self.direction_blocks: list[dict] = []
+        self.radius = {axis: min(2, self.max_step) for axis in self.tunable}
+        self.expected: dict | None = None
+        logger.info("Decision criteria: screen_objective=%r direction=%s redlines=%r "
+                    "safety_margin=%s min_improvement=%s pruning_threshold=%s",
+                    self.screen_objective, self.direction, self.constraints,
+                    self.safety_margin, self.min_improvement, self.pruning_threshold)
 
     @staticmethod
     def _finite(value) -> bool:
@@ -224,26 +264,182 @@ class HeuristicSearch(Strategy):
         return config
 
     def plan(self) -> dict:
-        return {"tuning": sorted({k for i in self.tunable for k in self.axes[i][0]}),
-                "extras": [], "notes": f"K3 {self.workload}: fixed recipe, coarse-to-fine "
-                f"local search, <= {self.max_trials} trials; early stop is not full coverage"}
+        return {
+            "tuning": sorted({k for i in self.tunable for k in self.axes[i][0]}),
+            "extras": [],
+            "notes": (f"{self.workload}: constraint-first local search, measured "
+                      f"directions and adaptive steps; <= {self.max_trials} trials; "
+                      "predictions do not guarantee SLO compliance or full coverage"),
+        }
 
-    def _neighbors(self, config: dict, coarse: bool) -> list[tuple[dict, str]]:
+    def observe(self, result: TrialResult) -> None:
+        if self.inflight is None:
+            raise RuntimeError("no outstanding proposal")
+        previous_best = deepcopy(self.best)
+        previous_center_metrics = self._metric_context(self.center)
+        full, self.inflight = self.inflight, None
+        result = deepcopy(result)
+        self.observations.append(result)
+        self.seen.add(canonical_key(result.config))
+        # Do not fit measurements whose platform-canonical config differs from
+        # the proposal: the measured point may no longer be on this local axis.
+        matches = result.config == prune_inactive(full, self.space)
+        if matches and not result.failure_class:
+            self._update_direction_blocks(full, result)
+            self.samples.append((deepcopy(full), result))
+        improved = matches and self._better_center(result)
+        metric_context = self._metric_context(result)
+        logger.info("Decision %s observation: inputs=%r previous_center=%r prediction=%r "
+                    "proposal_matches=%s center_updated=%s",
+                    self.proposed, metric_context, previous_center_metrics,
+                    self.expected, matches, improved)
+        if metric_context["missing_metrics"] or metric_context["invalid_metrics"]:
+            logger.warning("Decision %s: required metrics missing=%r invalid=%r metrics_type=%s; "
+                           "expected finite numeric values under literal benchmark.metrics keys",
+                           self.proposed, metric_context["missing_metrics"],
+                           metric_context["invalid_metrics"], metric_context["metrics_type"])
+        if self.expected is not None:
+            axis = self.expected["axis"]
+            metrics = self._metrics(result)
+            errors = [abs(metrics[k] - v) / max(abs(v), 1e-9)
+                      for k, v in self.expected["metrics"].items() if k in metrics]
+            if self._finite(result.objective) and self.expected["objective"] is not None:
+                errors.append(abs(result.objective - self.expected["objective"])
+                              / max(abs(self.expected["objective"]), 1e-9))
+            reliable = (matches and not result.failure_class
+                        and metrics.keys() == self.required_metrics
+                        and bool(errors) and max(errors) <= 0.2)
+            logger.info("Decision %s prediction check: axis=%s relative_errors=%r reliable=%s",
+                        self.proposed, axis, errors, reliable)
+            self.radius[axis] = (min(self.max_step, self.radius[axis] + 1)
+                                 if reliable and improved else max(1, self.radius[axis] // 2))
+        ranked = self._ranked()
+        self.best = deepcopy(ranked[0]) if ranked else None
+        if improved:
+            self.anchor, self.center = deepcopy(full), result
+            self.phase = "coarse"
+        logger.info("Decision %s outcome: center_updated=%s best_updated=%s center=%r best=%r "
+                    "radius=%r", self.proposed, improved, self.best != previous_best,
+                    self._metric_context(self.center), self._metric_context(self.best), self.radius)
+        # Re-rank even when a trial did not move the center: it supplies direction evidence.
+        self.pending = self._neighbors(self.anchor, self.phase != "fine")
+        if "oom" in result.failure_class.lower() or "out of memory" in result.error.lower():
+            repairs = []
+            for candidate, _ in self._adjacent_neighbors(full):
+                changed = [k for k in candidate if candidate[k] != full.get(k)]
+                if (changed and all(k in ("chunked_prefill_size", "max_running_requests",
+                                          "mem_fraction_static") for k in changed)
+                        and all(0 < candidate[k] < full[k] for k in changed)):
+                    repairs.append((candidate, "OOM repair: " + ",".join(changed)))
+            self.pending = repairs + self.pending
+        if self.decision_log is not None:
+            self.decision_log({
+                "event": "observation", "decision_id": self.proposed,
+                "config": result.config, "trial_id": result.trial_id,
+                "objective": result.objective, "platform_feasible": result.feasible,
+                "feasible": self._feasible(result), "metrics": self._metrics(result),
+                "raw_metrics": result.raw.get("metrics"),
+                "metric_context": metric_context,
+                "previous_center_metrics": previous_center_metrics,
+                "prediction": deepcopy(self.expected),
+                "failure_class": result.failure_class, "error": result.error,
+                "proposal_matches": matches, "center_updated": improved,
+                "best_updated": self.best != previous_best,
+                "center_config": prune_inactive(self.anchor, self.space),
+                "radius": {str(axis): radius for axis, radius in self.radius.items()},
+            })
+        self.expected = None
+
+    def _ranked(self) -> list[TrialResult]:
+        results = sorted((r for r in self.observations if self._feasible(r)),
+                         key=lambda r: r.objective, reverse=self.direction == "max")
+        unique = {}
+        for result in results:
+            unique.setdefault(canonical_key(result.config), result)
+        return list(unique.values())[:self.max_contenders]
+
+    def contenders(self) -> list[dict]:
+        return [build_contender(
+            rank, r.config, self.model.get("image", ""),
+            environment=r.raw.get("environment") or {},
+            env=self.model.get("extra_env"), volumes=self.model.get("extra_volumes"),
+            evidence={"screen_objective": r.objective, "workload": self.workload},
+            trial_ids=[r.trial_id] if r.trial_id is not None else [],
+        ) for rank, r in enumerate(self._ranked(), 1)]
+
+    def status(self) -> tuple[str, float | None]:
+        message = (f"{self.workload} {self.phase}: {len(self.observations)}/{self.max_trials}; "
+                   f"{self.reason}")
+        return message, min(1.0, self.proposed / self.max_trials)
+
+    def dump_state(self) -> dict:
+        ranked = self._ranked()
+        return {
+            "strategy": self.state_strategy, "context": self.context, "version": 2,
+            "seed": deepcopy(ranked[0].config if ranked else self.anchor),
+            "session_id": self.session_id, "min_improvement": self.min_improvement,
+            "seen": sorted(self.seen),
+            "observations": [asdict(result) for result in self.observations],
+            "best": asdict(self.best) if self.best is not None else None,
+            "anchor": deepcopy(self.anchor), "pending": deepcopy(self.pending),
+            "phase": self.phase, "reason": self.reason, "done": self.done,
+            "proposed": self.proposed, "inflight": deepcopy(self.inflight),
+            "center": asdict(self.center) if self.center is not None else None,
+            "samples": [[deepcopy(config), asdict(result)] for config, result in self.samples],
+            "radius": {str(axis): radius for axis, radius in self.radius.items()},
+        }
+
+    def load_state(self, blob: dict) -> None:
+        # Accept the previous V2 identifier only when reading existing checkpoints.
+        if (blob.get("strategy") not in (self.state_strategy, "k3-heuristic-v2")
+                or blob.get("context") != self.context):
+            return
+        if blob.get("version") != 2 or blob.get("min_improvement") != self.min_improvement:
+            return
+        self.seen = set(blob["seen"])
+        self.observations = [TrialResult(**deepcopy(row)) for row in blob["observations"]]
+        self.best = TrialResult(**deepcopy(blob["best"])) if blob["best"] is not None else None
+        self.anchor = deepcopy(blob["anchor"])
+        self.pending = [(deepcopy(config), reason) for config, reason in blob["pending"]]
+        self.phase, self.reason, self.done = blob["phase"], blob["reason"], blob["done"]
+        same_session = self.session_id is not None and blob.get("session_id") == self.session_id
+        self.proposed = blob["proposed"] if same_session else 0
+        self.inflight = None
+        if blob["inflight"] is not None:
+            # A proposal without a completed observation must remain eligible for retry.
+            full = deepcopy(blob["inflight"])
+            self.seen.discard(canonical_key(prune_inactive(full, self.space)))
+            self.pending.insert(0, (full, blob["reason"]))
+            if same_session:
+                self.proposed = max(0, self.proposed - 1)
+
+        self.center = (TrialResult(**deepcopy(blob["center"]))
+                       if blob["center"] is not None else None)
+        self.samples = [(deepcopy(config), TrialResult(**deepcopy(result)))
+                        for config, result in blob["samples"]]
+        samples, self.samples = self.samples, []
+        self.direction_blocks = []
+        for config, result in samples:
+            self._update_direction_blocks(config, result, emit=False)
+            self.samples.append((config, result))
+        self.radius = {int(axis): radius for axis, radius in blob["radius"].items()}
+        self.expected = None
+
+    def _adjacent_neighbors(self, config: dict) -> list[tuple[dict, str]]:
         proposals = []
         for axis in self.tunable:
             rows = self.axes[axis]
             index = next(i for i, row in enumerate(rows)
                          if all(config.get(k) == v for k, v in row.items()))
-            stride = max(1, (len(rows) - 1) // 2) if coarse else 1
             # Workload priority chooses the axis; measurement chooses direction.
-            for j in (index - stride, index + stride):
+            for j in (index - 1, index + 1):
                 if 0 <= j < len(rows):
                     candidate = dict(config)
                     candidate.update(rows[j])
                     proposals.append((candidate, f"{self.phase}: {','.join(rows[j])}"))
         return proposals
 
-    def next_config(self) -> dict | None:
+    def _next_proposal(self) -> dict | None:
         if self.inflight is not None:
             raise RuntimeError("observe the previous proposal before requesting another")
         while not self.done and self.proposed < self.max_trials:
@@ -264,150 +460,6 @@ class HeuristicSearch(Strategy):
             self.phase = "coarse" if self.phase == "baseline" else "fine"
             self.pending = self._neighbors(self.anchor, self.phase == "coarse")
         return None
-
-    def observe(self, result: TrialResult) -> None:
-        if self.inflight is None:
-            raise RuntimeError("no outstanding proposal")
-        full = self.inflight
-        self.inflight = None
-        self.observations.append(deepcopy(result))
-        self.seen.add(canonical_key(result.config))
-        valid = self._feasible(result)
-        if valid:
-            old = self.best.objective if self.best else None
-            gain = 0 if old is None else (result.objective - old) * (
-                1 if self.direction == "max" else -1)
-            if old is None or gain > self.min_improvement * max(abs(old), 1e-9):
-                self.best = deepcopy(result)
-                self.anchor = full
-                self.phase = "coarse"
-                self.pending = self._neighbors(full, coarse=True)
-        elif "oom" in result.failure_class.lower() or "out of memory" in result.error.lower():
-            # Local repair only: never globally blacklist a parameter value.
-            repairs = []
-            for candidate, _ in self._neighbors(full, coarse=False):
-                changed = [k for k in candidate if candidate[k] != full.get(k)]
-                if (changed and all(k in ("chunked_prefill_size", "max_running_requests",
-                                          "mem_fraction_static") for k in changed)
-                        and all(0 < candidate[k] < full[k] for k in changed)):
-                    repairs.append((candidate, "OOM repair: " + ",".join(changed)))
-            self.pending = repairs + self.pending
-
-    def _ranked(self) -> list[TrialResult]:
-        results = [r for r in self.observations if self._feasible(r)]
-        results.sort(key=lambda r: r.objective, reverse=self.direction == "max")
-        unique = {}
-        for result in results:
-            unique.setdefault(canonical_key(result.config), result)
-        return list(unique.values())[:self.max_contenders]
-
-    def contenders(self) -> list[dict]:
-        return [build_contender(
-            rank, r.config, self.model.get("image", ""),
-            environment=r.raw.get("environment") or {},
-            env=self.model.get("extra_env"), volumes=self.model.get("extra_volumes"),
-            evidence={"screen_objective": r.objective, "workload": self.workload},
-            trial_ids=[r.trial_id] if r.trial_id is not None else [],
-        ) for rank, r in enumerate(self._ranked(), 1)]
-
-    def status(self) -> tuple[str, float | None]:
-        message = (f"{self.workload} {self.phase}: {len(self.observations)}/{self.max_trials}; "
-                   f"{self.reason}")
-        return message, min(1.0, self.proposed / self.max_trials)
-
-    state_strategy = "k3-heuristic-v1"
-
-    def dump_state(self) -> dict:
-        ranked = self._ranked()
-        return {
-            "strategy": self.state_strategy, "context": self.context, "version": 2,
-            "seed": deepcopy(ranked[0].config if ranked else self.anchor),
-            "session_id": self.session_id, "min_improvement": self.min_improvement,
-            "seen": sorted(self.seen),
-            "observations": [asdict(result) for result in self.observations],
-            "best": asdict(self.best) if self.best is not None else None,
-            "anchor": deepcopy(self.anchor), "pending": deepcopy(self.pending),
-            "phase": self.phase, "reason": self.reason, "done": self.done,
-            "proposed": self.proposed, "inflight": deepcopy(self.inflight),
-        }
-
-    def load_state(self, blob: dict) -> None:
-        if (blob.get("strategy") != self.state_strategy or blob.get("context") != self.context):
-            return
-        if "version" not in blob:
-            # Legacy checkpoints contain no measurements, so their seed needs a new trial.
-            if isinstance(blob.get("seed"), dict):
-                self.anchor = self._project(blob["seed"])
-                self.pending = [(deepcopy(self.anchor), "warm-start baseline (remeasure)")]
-            return
-        if blob["version"] != 2 or blob.get("min_improvement") != self.min_improvement:
-            return
-        self.seen = set(blob["seen"])
-        self.observations = [TrialResult(**deepcopy(row)) for row in blob["observations"]]
-        self.best = TrialResult(**deepcopy(blob["best"])) if blob["best"] is not None else None
-        self.anchor = deepcopy(blob["anchor"])
-        self.pending = [(deepcopy(config), reason) for config, reason in blob["pending"]]
-        self.phase, self.reason, self.done = blob["phase"], blob["reason"], blob["done"]
-        same_session = self.session_id is not None and blob.get("session_id") == self.session_id
-        self.proposed = blob["proposed"] if same_session else 0
-        self.inflight = None
-        if blob["inflight"] is not None:
-            # A proposal without a completed observation must remain eligible for retry.
-            full = deepcopy(blob["inflight"])
-            self.seen.discard(canonical_key(prune_inactive(full, self.space)))
-            self.pending.insert(0, (full, blob["reason"]))
-            if same_session:
-                self.proposed = max(0, self.proposed - 1)
-
-
-logger = logging.getLogger(__name__)
-
-
-class HeuristicSearchV2(HeuristicSearch):
-    """Keep feasible winners separate from an optionally infeasible search center.
-
-    Local models use measurements with identical other axes. Numeric single
-    axes use actual values; tied numeric rows use row coordinates (group effect).
-    Categorical axes are explored without linear extrapolation. Predictions only
-    prioritize experiments; measured feasibility alone admits contenders.
-    """
-
-    def __init__(self, *, safety_margin: float = 0.05,
-                 max_step: int = 4, pruning_threshold: float = 0.1, decision_log=None, **kwargs):
-        super().__init__(**kwargs)
-        if not math.isfinite(safety_margin) or not 0 <= safety_margin < 1:
-            raise ValueError("safety_margin must be finite and in [0, 1)")
-        if isinstance(max_step, bool) or not isinstance(max_step, int) or max_step < 1:
-            raise ValueError("max_step must be a positive integer")
-        if not self._finite(pruning_threshold) or pruning_threshold <= 0:
-            raise ValueError("pruning_threshold must be finite and positive")
-        self.safety_margin = safety_margin
-        self.max_step = max_step
-        self.pruning_threshold = pruning_threshold
-        self.decision_log = decision_log
-
-    def setup(self, manifest: dict) -> None:
-        super().setup(manifest)
-        # The campaign manifest is the single source of truth for SLOs.
-        self.constraints = self.screen_redlines
-        self.required_metrics = {spec["metric"] for spec in self.constraints}
-        self.context = canonical_key({"v1": self.context, "constraints": self.constraints,
-                                      "safety_margin": self.safety_margin,
-                                      "max_step": self.max_step})
-        # Keep default-policy checkpoints compatible: their samples can supply
-        # pruning evidence even when written before direction pruning existed.
-        if self.pruning_threshold != 0.1:
-            self.context = canonical_key({"context": self.context,
-                                          "pruning_threshold": self.pruning_threshold})
-        self.center: TrialResult | None = None
-        self.samples: list[tuple[dict, TrialResult]] = []
-        self.direction_blocks: list[dict] = []
-        self.radius = {axis: min(2, self.max_step) for axis in self.tunable}
-        self.expected: dict | None = None
-        logger.info("Decision criteria: screen_objective=%r direction=%s redlines=%r "
-                    "safety_margin=%s min_improvement=%s pruning_threshold=%s",
-                    self.screen_objective, self.direction, self.constraints,
-                    self.safety_margin, self.min_improvement, self.pruning_threshold)
 
     def _metric_context(self, result: TrialResult | None) -> dict | None:
         """Snapshot the measured inputs actually used for ranking and feasibility."""
@@ -634,10 +686,10 @@ class HeuristicSearchV2(HeuristicSearch):
         return [(config, reason) for _, config, reason in candidates]
 
     def next_config(self) -> dict | None:
-        # Also cover restored queues and OOM repair candidates from the base class.
+        # Also cover restored queues and OOM repair candidates queued after observations.
         self.pending = [(config, reason) for config, reason in self.pending
                         if not self._direction_pruned(config)]
-        config = super().next_config()
+        config = self._next_proposal()
         self.expected = None
         if config is not None and self.center is not None:
             changed = [axis for axis in self.tunable
@@ -660,130 +712,10 @@ class HeuristicSearchV2(HeuristicSearch):
                        if (key in center) != (key in config) or center.get(key) != config.get(key)]
             self.decision_log({
                 "event": "proposal", "decision_id": self.proposed,
-                "strategy": "k3-heuristic-v2", "phase": self.phase, "reason": self.reason,
+                "strategy": self.state_strategy, "phase": self.phase, "reason": self.reason,
                 "center_config": center, "config": config, "changes": changes,
                 "prediction": deepcopy(self.expected),
                 "center_metrics": self._metric_context(self.center),
                 "radius": {str(axis): radius for axis, radius in self.radius.items()},
             })
         return config
-
-    def observe(self, result: TrialResult) -> None:
-        if self.inflight is None:
-            raise RuntimeError("no outstanding proposal")
-        previous_best = deepcopy(self.best)
-        previous_center_metrics = self._metric_context(self.center)
-        full, self.inflight = self.inflight, None
-        result = deepcopy(result)
-        self.observations.append(result)
-        self.seen.add(canonical_key(result.config))
-        # Do not fit measurements whose platform-canonical config differs from
-        # the proposal: the measured point may no longer be on this local axis.
-        matches = result.config == prune_inactive(full, self.space)
-        if matches and not result.failure_class:
-            self._update_direction_blocks(full, result)
-            self.samples.append((deepcopy(full), result))
-        improved = matches and self._better_center(result)
-        metric_context = self._metric_context(result)
-        logger.info("Decision %s observation: inputs=%r previous_center=%r prediction=%r "
-                    "proposal_matches=%s center_updated=%s",
-                    self.proposed, metric_context, previous_center_metrics,
-                    self.expected, matches, improved)
-        if metric_context["missing_metrics"] or metric_context["invalid_metrics"]:
-            logger.warning("Decision %s: required metrics missing=%r invalid=%r metrics_type=%s; "
-                           "expected finite numeric values under literal benchmark.metrics keys",
-                           self.proposed, metric_context["missing_metrics"],
-                           metric_context["invalid_metrics"], metric_context["metrics_type"])
-        if self.expected is not None:
-            axis = self.expected["axis"]
-            metrics = self._metrics(result)
-            errors = [abs(metrics[k] - v) / max(abs(v), 1e-9)
-                      for k, v in self.expected["metrics"].items() if k in metrics]
-            if self._finite(result.objective) and self.expected["objective"] is not None:
-                errors.append(abs(result.objective - self.expected["objective"])
-                              / max(abs(self.expected["objective"]), 1e-9))
-            reliable = (matches and not result.failure_class
-                        and metrics.keys() == self.required_metrics
-                        and bool(errors) and max(errors) <= 0.2)
-            logger.info("Decision %s prediction check: axis=%s relative_errors=%r reliable=%s",
-                        self.proposed, axis, errors, reliable)
-            self.radius[axis] = (min(self.max_step, self.radius[axis] + 1)
-                                 if reliable and improved else max(1, self.radius[axis] // 2))
-        ranked = self._ranked()
-        self.best = deepcopy(ranked[0]) if ranked else None
-        if improved:
-            self.anchor, self.center = deepcopy(full), result
-            self.phase = "coarse"
-        logger.info("Decision %s outcome: center_updated=%s best_updated=%s center=%r best=%r "
-                    "radius=%r", self.proposed, improved, self.best != previous_best,
-                    self._metric_context(self.center), self._metric_context(self.best), self.radius)
-        # Re-rank even when a trial did not move the center: it supplies direction evidence.
-        self.pending = self._neighbors(self.anchor, self.phase != "fine")
-        if "oom" in result.failure_class.lower() or "out of memory" in result.error.lower():
-            repairs = []
-            for candidate, _ in super()._neighbors(full, coarse=False):
-                changed = [k for k in candidate if candidate[k] != full.get(k)]
-                if (changed and all(k in ("chunked_prefill_size", "max_running_requests",
-                                          "mem_fraction_static") for k in changed)
-                        and all(0 < candidate[k] < full[k] for k in changed)):
-                    repairs.append((candidate, "OOM repair: " + ",".join(changed)))
-            self.pending = repairs + self.pending
-        if self.decision_log is not None:
-            self.decision_log({
-                "event": "observation", "decision_id": self.proposed,
-                "config": result.config, "trial_id": result.trial_id,
-                "objective": result.objective, "platform_feasible": result.feasible,
-                "feasible": self._feasible(result), "metrics": self._metrics(result),
-                "raw_metrics": result.raw.get("metrics"),
-                "metric_context": metric_context,
-                "previous_center_metrics": previous_center_metrics,
-                "prediction": deepcopy(self.expected),
-                "failure_class": result.failure_class, "error": result.error,
-                "proposal_matches": matches, "center_updated": improved,
-                "best_updated": self.best != previous_best,
-                "center_config": prune_inactive(self.anchor, self.space),
-                "radius": {str(axis): radius for axis, radius in self.radius.items()},
-            })
-        self.expected = None
-
-    def _ranked(self) -> list[TrialResult]:
-        results = sorted((r for r in self.observations if self._feasible(r)),
-                         key=lambda r: r.objective, reverse=self.direction == "max")
-        unique = {}
-        for result in results:
-            unique.setdefault(canonical_key(result.config), result)
-        return list(unique.values())[:self.max_contenders]
-
-    def plan(self) -> dict:
-        plan = super().plan()
-        plan["notes"] = (f"K3 {self.workload} V2: constraint-first local search, measured "
-                         f"directions and adaptive steps; <= {self.max_trials} trials; "
-                         "predictions do not guarantee SLO compliance or full coverage")
-        return plan
-
-    state_strategy = "k3-heuristic-v2"
-
-    def dump_state(self) -> dict:
-        return {
-            **super().dump_state(),
-            "center": asdict(self.center) if self.center is not None else None,
-            "samples": [[deepcopy(config), asdict(result)] for config, result in self.samples],
-            "radius": {str(axis): radius for axis, radius in self.radius.items()},
-        }
-
-    def load_state(self, blob: dict) -> None:
-        super().load_state(blob)
-        if (blob.get("strategy") == self.state_strategy and blob.get("context") == self.context
-                and blob.get("version") == 2
-                and blob.get("min_improvement") == self.min_improvement):
-            self.center = (TrialResult(**deepcopy(blob["center"]))
-                           if blob["center"] is not None else None)
-            self.samples = [(deepcopy(config), TrialResult(**deepcopy(result)))
-                            for config, result in blob["samples"]]
-            samples, self.samples = self.samples, []
-            self.direction_blocks = []
-            for config, result in samples:
-                self._update_direction_blocks(config, result, emit=False)
-                self.samples.append((config, result))
-            self.radius = {int(axis): radius for axis, radius in blob["radius"].items()}
-            self.expected = None
