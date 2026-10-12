@@ -5,6 +5,9 @@ ARG BASE=python:3.12-slim
 FROM ${BASE}
 
 WORKDIR /policy
+# Print straight to the log: a buffered line is lost when the platform
+# removes the container.
+ENV PYTHONUNBUFFERED=1
 COPY autotune_policy/ ./autotune_policy/
 COPY strategies/ ./strategies/
 COPY main.py ./

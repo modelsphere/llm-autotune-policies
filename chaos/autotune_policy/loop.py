@@ -13,6 +13,7 @@ this; the reference random-search policy does not need to.
 
 from __future__ import annotations
 
+import logging
 import time
 
 from . import space
@@ -26,6 +27,11 @@ from .client import (
     SessionOver,
 )
 from .strategy import Strategy, TrialResult
+
+# One line per step, so the container's log says what the policy did: the
+# platform saves it when the session ends, and a policy that logs nothing
+# leaves an empty log behind.
+logger = logging.getLogger("autotune_policy")
 
 _ACTIVE = "run"
 _DONE_LAUNCH = {"serving", "failed", "released"}
@@ -54,6 +60,7 @@ class SearchLoop:
         # measured trial; hold it and try it again rather than discard it, or a
         # capacity blip silently drops points from the sweep.
         self._retry: dict | None = None
+        self._finalists = 0
 
     # -- entry point -----------------------------------------------------------
     def run(self, client: PolicyClient) -> int:
@@ -63,6 +70,13 @@ class SearchLoop:
         )
         self._state_enabled = bool((manifest.get("services") or {}).get("state"))
         self._space = manifest.get("search_space") or {}
+        logger.info(
+            "%s starting: %s on %s, search until %s",
+            type(self.strategy).__name__,
+            (manifest.get("model") or {}).get("served_model_name", "?"),
+            (manifest.get("hardware") or {}).get("machine", "?"),
+            (manifest.get("time") or {}).get("search_deadline") or "no deadline",
+        )
         self.strategy.setup(manifest)
 
         hb = client.heartbeat(phase="starting", message="handshake", handshake={
@@ -72,18 +86,23 @@ class SearchLoop:
         plan = self.strategy.plan()
         client.put_plan(tuning=plan.get("tuning", []), extras=plan.get("extras", []),
                         notes=plan.get("notes", ""))
+        logger.info("plan: tuning %s", ", ".join(plan.get("tuning", [])) or "nothing declared")
         self.strategy.load_state(client.get_state())
 
         try:
             while True:
                 command = hb.get("command", _ACTIVE)
                 if command in ("exit", "abort"):
+                    logger.info("platform says %s; releasing engines and exiting", command)
                     self._teardown(client)
                     return 0
                 if command == "finalize":
+                    logger.info("platform says finalize: no new trials")
                     hb = self._finalize(client)
                     continue
                 if command == "serve":
+                    logger.info("platform says serve contender %s on port %s",
+                                hb.get("contender_id"), hb.get("port"))
                     self._serve(client, manifest, hb.get("contender_id"), hb.get("port"))
                     hb = self._beat(client, "validating",
                                     f"serving contender {hb.get('contender_id')}")
@@ -92,10 +111,11 @@ class SearchLoop:
                 hb = self._search_once(client, manifest)
         except SessionOver:
             raise  # the platform is done with us — a clean exit, not an error
-        except Exception as exc:  # noqa: BLE001 — surface ANY strategy bug as a signal
+        except Exception as exc:  # surface ANY strategy bug as a signal
             # A crash in the search logic is not silent death: tell the platform
             # we gave up (so it finalizes and validates what we already found)
             # rather than making it wait out the heartbeat timeout.
+            logger.exception("search logic failed; telling the platform")
             self._signal_error(client, exc)
             return 1
 
@@ -110,6 +130,7 @@ class SearchLoop:
             # platform finalizes now instead of waiting out the deadline; the
             # idle watchdog would eventually catch us, but saying so is the
             # cooperative thing to do.
+            logger.info("nothing left to try after %d trial(s)", self._seq)
             return self._beat(client, "searching",
                               self._status_msg() + " (nothing left to try)",
                               progress=1.0, status="exhausted", coverage=self._coverage())
@@ -121,11 +142,14 @@ class SearchLoop:
         port = (hw.get("ports") or [None])[0]
         self._seq += 1
         tag = f"t{self._seq}"
+        logger.info("%s: launch %s on GPU %s", tag, _args(config),
+                    ",".join(str(g) for g in gpus) or "-")
 
         try:
             launch = client.launch(engine_args=config, gpu_indices=gpus, port=port,
                                    idempotency_key=f"{tag}-launch")
         except ConfigRejected as exc:
+            logger.info("%s: rejected: %s", tag, exc)
             self._observed_configs.append(config)
             self.strategy.observe(TrialResult(config=config, objective=None, feasible=False,
                                               failure_class="bad_config", error=str(exc)))
@@ -137,6 +161,7 @@ class SearchLoop:
             # than us busy-spinning launch calls against a port that is not free
             # yet (the run loop calls us straight back on an early return).
             self._retry = config
+            logger.info("%s: no free cards yet; will retry", tag)
             hb = self._beat(client, "searching", f"{tag}: no free cards yet, will retry")
             if hb.get("command", _ACTIVE) == _ACTIVE:
                 self._sleep(self._poll)
@@ -150,6 +175,9 @@ class SearchLoop:
             self._release(client, launch_id)
             return hb
         if launch.get("status") != "serving":
+            logger.info("%s: launch %s %s: %s", tag, launch_id,
+                        launch.get("failure_class") or launch.get("status"),
+                        (launch.get("error") or "")[:300])
             self._observed_configs.append(launch.get("config") or config)
             self.strategy.observe(TrialResult(
                 config=config, objective=None, feasible=False,
@@ -170,6 +198,7 @@ class SearchLoop:
             return self._beat(client, "searching", f"{tag}: bench refused ({exc})")
 
         bench_id = bench["id"]
+        logger.info("%s: launch %s serving; benchmark %s started", tag, launch_id, bench_id)
         bench, hb = self._wait(client, lambda: client.get_benchmark(bench_id), _DONE_BENCH,
                                f"{tag}: benchmarking")
         self._release(client, launch_id)
@@ -177,6 +206,11 @@ class SearchLoop:
         # arrived, a measurement in hand is not one to throw away.
         if bench.get("status") in _DONE_BENCH:
             summary = bench.get("summary") or {}
+            logger.info(
+                "%s: benchmark %s %s: objective %s%s", tag, bench_id, bench.get("status"),
+                summary.get("objective_value"),
+                "" if summary.get("feasible") else " (redlines crossed)",
+            )
             self._observed_configs.append(canonical)
             self.strategy.observe(TrialResult(
                 config=canonical,
@@ -202,6 +236,7 @@ class SearchLoop:
             client.finalized()
         except PhaseError:
             pass  # already finalized on a retry
+        logger.info("finalized after %d trial(s); the platform measures the finalists", self._seq)
         return self._beat(client, "validating", "finalized; awaiting validation")
 
     def _serve(self, client: PolicyClient, manifest: dict, contender_id, port) -> None:
@@ -279,7 +314,11 @@ class SearchLoop:
 
     def _refresh(self, client: PolicyClient) -> None:
         try:
-            client.put_contenders(self.strategy.contenders())
+            contenders = self.strategy.contenders()
+            client.put_contenders(contenders)
+            if len(contenders) != self._finalists:
+                self._finalists = len(contenders)
+                logger.info("finalists now: %d", self._finalists)
         except PhaseError:
             pass  # frozen at finalize
         if self._state_enabled:
@@ -301,3 +340,7 @@ class SearchLoop:
 
     def _status_msg(self) -> str:
         return self.strategy.status()[0] or "searching"
+
+
+def _args(config: dict) -> str:
+    return " ".join(f"{k}={v}" for k, v in config.items()) or "(defaults)"
