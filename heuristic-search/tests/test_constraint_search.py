@@ -4,7 +4,7 @@ import pytest
 
 from autotune_policy import SearchLoop
 from autotune_policy.strategy import TrialResult
-from strategies.heuristic_search import HeuristicSearchV2
+from strategies.heuristic_search import HeuristicSearch
 from tests.test_heuristic_search import manifest
 from tests.test_night import MANIFEST, FakePlatform
 
@@ -13,7 +13,7 @@ CONSTRAINTS = [{"metric": "ttft", "op": "<", "value": 8}]
 
 def strategy(values=(16, 32, 48, 64, 80, 96), baseline=64, **kwargs):
     redlines = kwargs.pop("constraints", [])
-    obj = HeuristicSearchV2(baseline={"max_running_requests": baseline}, **kwargs)
+    obj = HeuristicSearch(baseline={"max_running_requests": baseline}, **kwargs)
     spec = manifest({"grid": {"max_running_requests": list(values)}})
     spec["objective"]["screen"]["redlines"] = redlines
     obj.setup(spec)
@@ -150,7 +150,7 @@ def test_uneven_numeric_values_use_actual_distance():
 
 
 def test_other_axis_changes_do_not_supply_a_slope():
-    obj = HeuristicSearchV2()
+    obj = HeuristicSearch()
     obj.setup(manifest({"grid": {"max_running_requests": [16, 32, 64],
                                 "chunked_prefill_size": [2048, 4096, 8192]}}))
     report(obj, obj.next_config(), 100)
@@ -160,7 +160,7 @@ def test_other_axis_changes_do_not_supply_a_slope():
 
 
 def test_tied_axes_fixed_topology_conditions_and_budget():
-    obj = HeuristicSearchV2(max_trials=5, baseline={"tp_size": 2})
+    obj = HeuristicSearch(max_trials=5, baseline={"tp_size": 2})
     obj.setup(manifest({"base": {"mode": "off"},
                         "grid": {"tp_size": [1, 2], "prefill_max_requests": [1, 2]},
                         "tied": [{"max_running_requests": [16, 32, 64],
@@ -203,7 +203,7 @@ def test_warm_start_restores_and_rejects_changed_constraints():
 
 def test_full_platform_lifecycle_without_explicit_constraints():
     fake = FakePlatform(MANIFEST, target_trials=999)
-    obj = HeuristicSearchV2(max_trials=2)
+    obj = HeuristicSearch(max_trials=2)
     assert SearchLoop(obj, sleep=lambda _: None).run(fake) == 0
     assert fake.trials == 2
     assert fake.finalized_called and fake.served
@@ -212,7 +212,7 @@ def test_full_platform_lifecycle_without_explicit_constraints():
 def test_manifest_constraints_and_invalid_definition():
     spec = manifest({"grid": {"max_running_requests": [16, 32]}})
     spec["objective"]["screen"]["redlines"] = CONSTRAINTS
-    obj = HeuristicSearchV2()
+    obj = HeuristicSearch()
     obj.setup(spec)
     assert obj.constraints == CONSTRAINTS
     with pytest.raises(ValueError, match="invalid screen redline"):
@@ -331,7 +331,7 @@ def test_direction_pruning_respects_lower_bounds_and_strictness(op, old, new, bl
 
 
 def test_other_parameter_change_reopens_pruned_direction():
-    obj = HeuristicSearchV2(baseline={"max_running_requests": 48,
+    obj = HeuristicSearch(baseline={"max_running_requests": 48,
                                     "chunked_prefill_size": 8192})
     spec = manifest({"grid": {"max_running_requests": [48, 64, 80],
                               "chunked_prefill_size": [4096, 8192]}})
@@ -414,7 +414,7 @@ def test_tied_axes_and_activation_changes_supply_no_direction_evidence():
          {"max_running_requests": 16},
          {"max_running_requests": 32, "prefill_max_requests": 1}),
     ]:
-        obj = HeuristicSearchV2(baseline=baseline)
+        obj = HeuristicSearch(baseline=baseline)
         spec = manifest(space)
         spec["objective"]["screen"]["redlines"] = CONSTRAINTS
         obj.setup(spec)

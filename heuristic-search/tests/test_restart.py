@@ -7,45 +7,42 @@ import pytest
 from autotune_policy import SearchLoop
 from autotune_policy.space import canonical_key
 from autotune_policy.strategy import TrialResult
-from strategies.heuristic_search import HeuristicSearch, HeuristicSearchV2
+from strategies.heuristic_search import HeuristicSearch
 from tests.test_heuristic_search import manifest
 from tests.test_night import FakePlatform
 
 
-@pytest.mark.parametrize("cls", [HeuristicSearch, HeuristicSearchV2])
 @pytest.mark.parametrize("new_session", [False, True])
-def test_restart_retains_results_and_skips_completed_trials(cls, new_session):
+def test_restart_retains_results_and_skips_completed_trials(new_session):
     spec = manifest({"grid": {"max_running_requests": [8, 16, 32, 64, 128]}})
     first = FakePlatform(spec, target_trials=2)
-    original = cls(max_trials=2)
+    original = HeuristicSearch(max_trials=2)
     assert SearchLoop(original, sleep=lambda _: None).run(first) == 0
     saved = json.loads(json.dumps(first.state))
     if new_session:
         spec = deepcopy(spec)
         spec["session_id"] += 1
-    restored = cls(max_trials=4)
+    restored = HeuristicSearch(max_trials=4)
     restored.setup(spec)
     restored.load_state(saved)
     assert restored.observations == original.observations
     assert restored.contenders() == original.contenders()
-    if cls is HeuristicSearchV2:
-        assert restored.samples == original.samples
-        assert restored.center == original.center
-        assert restored.radius == original.radius
+    assert restored.samples == original.samples
+    assert restored.center == original.center
+    assert restored.radius == original.radius
     completed = {canonical_key(r.config) for r in original.observations}
     assert canonical_key(restored.next_config()) not in completed
     assert restored.proposed == (1 if new_session else 3)
 
 
-@pytest.mark.parametrize("cls", [HeuristicSearch, HeuristicSearchV2])
-def test_restart_preserves_failed_trials_and_retries_unfinished_proposal(cls):
+def test_restart_preserves_failed_trials_and_retries_unfinished_proposal():
     spec = manifest({"grid": {"max_running_requests": [8, 16, 32, 64]}})
-    original = cls()
+    original = HeuristicSearch()
     original.setup(spec)
     failed = original.next_config()
     original.observe(TrialResult(failed, None, False, failure_class="oom"))
     unfinished = original.next_config()
-    restored = cls()
+    restored = HeuristicSearch()
     restored.setup(spec)
     restored.load_state(json.loads(json.dumps(original.dump_state())))
     assert restored.observations == original.observations
@@ -53,19 +50,17 @@ def test_restart_preserves_failed_trials_and_retries_unfinished_proposal(cls):
     assert restored.next_config() == unfinished
 
 
-@pytest.mark.parametrize("cls", [HeuristicSearch, HeuristicSearchV2])
-def test_legacy_seed_still_loads(cls):
+def test_legacy_seed_is_ignored():
     spec = manifest({"grid": {"max_running_requests": [8, 16, 32, 64]}})
-    obj = cls()
+    obj = HeuristicSearch()
     obj.setup(spec)
     obj.load_state({"strategy": obj.state_strategy, "context": obj.context,
                     "seed": {"max_running_requests": 64}})
     assert obj.observations == []
-    assert obj.next_config() == {"max_running_requests": 64}
+    assert obj.next_config() == {"max_running_requests": 32}
 
 
-@pytest.mark.parametrize("cls", [HeuristicSearch, HeuristicSearchV2])
-def test_abrupt_stop_then_loop_restart_does_not_repeat_completed_trials(cls):
+def test_abrupt_stop_then_loop_restart_does_not_repeat_completed_trials():
     class Stopped(BaseException):
         pass
 
@@ -93,10 +88,10 @@ def test_abrupt_stop_then_loop_restart_does_not_repeat_completed_trials(cls):
     spec = manifest({"grid": {"max_running_requests": [8, 16, 32, 64, 128]}})
     fake = RestartPlatform(spec)
     with pytest.raises(Stopped):
-        SearchLoop(cls(max_trials=8), sleep=lambda _: None).run(fake)
+        SearchLoop(HeuristicSearch(max_trials=8), sleep=lambda _: None).run(fake)
     assert not fake.finalized_called
     fake.stop = False
-    restored = cls(max_trials=8)
+    restored = HeuristicSearch(max_trials=8)
     assert SearchLoop(restored, sleep=lambda _: None).run(fake) == 0
     assert len(fake.configs) == len(set(fake.configs))
     assert len(restored.observations) == fake.trials
@@ -118,7 +113,7 @@ def test_rejected_config_is_checkpointed_before_exit():
 
     spec = manifest({"grid": {"max_running_requests": [8, 16, 32, 64]}})
     fake = RejectedPlatform(spec)
-    assert SearchLoop(HeuristicSearchV2(), sleep=lambda _: None).run(fake) == 0
+    assert SearchLoop(HeuristicSearch(), sleep=lambda _: None).run(fake) == 0
     assert fake.state["observations"][0]["failure_class"] == "bad_config"
 
 
@@ -130,5 +125,31 @@ def test_state_write_failure_is_visible(caplog):
             raise PolicyError(503, {"error": "unavailable"})
 
     fake = BrokenState(manifest({"grid": {"max_running_requests": [16, 32]}}), target_trials=1)
-    assert SearchLoop(HeuristicSearchV2(), sleep=lambda _: None).run(fake) == 0
+    assert SearchLoop(HeuristicSearch(), sleep=lambda _: None).run(fake) == 0
     assert "Failed to persist strategy state" in caplog.text
+
+
+def test_previous_v2_checkpoint_resumes_with_neutral_identifier():
+    from pathlib import Path
+
+    # Captured from the pre-consolidation V2 implementation, including an
+    # unfinished proposal and measurements that establish a direction block.
+    fixture = json.loads((Path(__file__).parent / "fixtures" /
+                          "heuristic_v2_checkpoint.json").read_text())
+    obj = HeuristicSearch()
+    obj.setup(fixture["manifest"])
+    obj.load_state(fixture["checkpoint"])
+    saved = obj.dump_state()
+    assert saved["strategy"] == "heuristic-search"
+    for key in ("observations", "samples", "center", "radius", "best"):
+        assert saved[key] == fixture["checkpoint"][key]
+    assert obj.direction_blocks
+    assert obj.next_config() == fixture["next_config"]
+
+
+def test_v1_checkpoint_is_ignored():
+    obj = HeuristicSearch()
+    obj.setup(manifest({"grid": {"max_running_requests": [16, 32, 64]}}))
+    initial = obj.dump_state()
+    obj.load_state({**initial, "strategy": "k3-heuristic-v1", "proposed": 20})
+    assert obj.dump_state() == initial

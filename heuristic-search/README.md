@@ -1,8 +1,9 @@
 # Heuristic search policy
 
-The entrypoint runs `HeuristicSearchV2`. Both the shared `HeuristicSearch` base
-and its constraint-aware V2 implementation live in `strategies/heuristic_search.py`;
-there is no separate V2 module. Existing checkpoint formats are preserved.
+The entrypoint runs the single `HeuristicSearch` class in
+`strategies/heuristic_search.py`. It preserves the constraint-aware search behavior
+and accepts existing V2 checkpoints. New checkpoints use the model-neutral
+`heuristic-search` identifier; V1 and seed-only checkpoints are not supported.
 
 From this directory:
 
@@ -24,11 +25,11 @@ Simulation uses synthetic metrics; it does not validate real GPU performance.
 The SDK is vendored from the repository root; update it there and run
 `scripts/sync-sdk.sh`. CI tests and builds this policy, but does not publish it.
 
-## Kimi K3 heuristic strategy
+## Heuristic strategy
 
 `strategies/heuristic_search.py` provides `HeuristicSearch`, a deterministic,
-budgeted local search for a **previously validated SGLang K3 deployment**.
-To select it, replace the strategy import and construction in `main.py`:
+budgeted local search for a **previously validated deployment**.
+To configure it directly:
 
 ```python
 from strategies.heuristic_search import HeuristicSearch
@@ -36,8 +37,8 @@ from strategies.heuristic_search import HeuristicSearch
 run_policy(SearchLoop(HeuristicSearch(workload="long_prefill", max_trials=24)))
 ```
 
-Profiles: `interactive`, `long_prefill`, `long_decode`, `agent`, `batch`, `mixed`
-(default). Profiles prioritize different operational parameters; they do not
+Profiles: `interactive`, `long_prefill`, `long_decode`, `agent` (default), `batch`, `mixed`.
+Profiles prioritize different operational parameters; they do not
 infer workload characteristics from a score or enable new engine features.
 Only supported knobs present in `search_space` are varied. Topology, backend,
 precision, cache mode and speculative decoding remain fixed. Validate those as
@@ -47,14 +48,14 @@ The initial point projects production arguments (optionally overridden with
 `baseline={...}`) onto declared values. For missing operational values it uses
 conservative seed hints; other dimensions use their first declared value. Supply
 a validated baseline, particularly `mamba_full_memory_ratio`: there is no universal
-K3 memory-pool ratio. Unknown parameters outside the space are not copied in.
+memory-pool ratio. Unknown parameters outside the space are not copied in.
 Tied groups move atomically and are fixed if any column is not a supported knob.
 Conditions are pruned before deduplication. Overlapping axes, empty domains and
 malformed ranges are rejected during setup.
 
-Search measures the baseline, tries coarse neighbors in workload priority order,
-then adjacent values. A relative improvement above `min_improvement=0.01` moves
-the search center; all feasible measured results remain eligible as contenders.
+Search measures the baseline, probes adjacent values, and uses local predictions
+to rank larger steps within an adaptive trust radius. Once the center is feasible,
+a relative improvement above `min_improvement=0.01` moves the search center; all feasible measured results remain eligible as contenders.
 OOM feedback prioritizes local reductions of chunk size, concurrency or static
 memory, without blacklisting an entire parameter value. The strategy stops on
 budget exhaustion or a fully visited local neighborhood, **not** proof of global
@@ -67,22 +68,21 @@ Matching contexts resume without remeasuring completed configurations. A restart
 in the same session retains the trial budget counter; a new session receives a
 fresh budget while retaining historical evidence. Changed model, hardware, search
 space, objectives or strategy settings invalidate incompatible checkpoints.
-Legacy seed-only checkpoints still load, but require remeasurement because they
-contain no historical results. Coverage remains the loop's current-run measured-axis
+Coverage remains the loop's current-run measured-axis
 coverage, not a claim that the entire Cartesian space has been searched.
 
 You never touch `loop.py` or `client.py` unless you need something exotic
 (serving your own engines, many concurrent launches) — subclass `SearchLoop`
 then.
 
-## Constraint-aware heuristic V2
+## Constraint-aware search
 
-`strategies/heuristic_search.py` provides `HeuristicSearchV2`. The entrypoint selects V2 by default. To configure it directly:
+The same class exposes constraint-aware search settings:
 
 ```python
-from strategies.heuristic_search import HeuristicSearchV2
+from strategies.heuristic_search import HeuristicSearch
 
-run_policy(SearchLoop(HeuristicSearchV2(
+run_policy(SearchLoop(HeuristicSearch(
     workload="agent",
     max_trials=24,
     safety_margin=0.05,
@@ -90,8 +90,8 @@ run_policy(SearchLoop(HeuristicSearchV2(
 )))
 ```
 
-Both heuristic versions read the platform manifest directly; no constructor
-`constraints` or `heuristic_v2.constraints` mapping is needed or supported now.
+The strategy reads constraints directly from the platform manifest; a separate
+constructor constraints mapping is not supported.
 The interface is:
 
 ```json
@@ -151,17 +151,17 @@ reject screen contenders. Screen contenders are not claims of verify success.
 Supported operators are `<`, `<=`, `>`, and `>=`; multiple bounds on one metric
 are preserved. Missing or nonfinite screen metrics fail local feasibility closed,
 and platform feasibility is also required. SLO misses from completed benchmarks
-can guide V2 repair with `feasible=false` and no execution `failure_class`;
+can guide constraint repair with `feasible=false` and no execution `failure_class`;
 failed launches/benchmarks are not fitted as measurements.
 
-To guide V2 with a continuous TTFT signal, declare a screen redline such as
+To guide the strategy with a continuous TTFT signal, declare a screen redline such as
 `{"metric": "perf_guidellm_sweep.ttft_p99", "op": "<", "value": 8.0}` using the
 actual metric's units. A `reported_level_meets_slo >= 1` flag alone reveals only
 pass/fail; the strategy cannot infer how many seconds a request exceeds the SLO.
 For binary flags, `safety_margin=0` avoids predicting an unattainable inward
 margin above 1. No undeclared latency threshold is inferred from the flag.
 
-V2 keeps the search center separate from the best feasible result. Before finding
+The strategy keeps the search center separate from the best feasible result. Before finding
 a feasible point, it accepts reductions in the worst normalized SLO violation,
 then total violation as a tie-breaker, even without an objective value. After
 finding a feasible center, only feasible objective improvements above
@@ -188,11 +188,11 @@ one-row probes. This is a local linear heuristic, not a statistical confidence
 model: it does not estimate measurement noise or guarantee safe experiments.
 Predicted-risk directions remain fallback experiments, so SLO violations during
 search are possible; **only measured feasible configurations become contenders**.
-OOMs retain V1's local downward repairs. Budget, declared values, fixed topology,
-tied rows, conditional pruning and deduplication retain V1 semantics.
+OOMs trigger local downward repairs. The strategy respects the trial budget,
+declared values, fixed topology, tied rows, conditional pruning and deduplication.
 
 Measured worsening can prune further exploration along a single numeric axis.
-With all other active parameters unchanged, V2 compares a new measurement with
+With all other active parameters unchanged, the strategy compares a new measurement with
 the nearest previous measurement on either side. If a screen redline fails and
 its metric worsens by at least `pruning_threshold` (default `0.1`) times
 `max(abs(limit), abs(previous_measurement), 1e-9)`, candidates strictly beyond
@@ -206,7 +206,7 @@ This is a heuristic based on measured evidence, not proof of monotonicity, and c
 miss a nonmonotonic recovery farther away. Set the constructor's
 `pruning_threshold` to a larger positive value to make pruning more conservative.
 
-V2 checkpoints additionally restore the measured samples, center and adaptive
+Checkpoints also restore the measured samples, center and adaptive
 step radii used for predictions. Direction boundaries are rebuilt from those
 samples on restore. V1 state and changed constraints or pruning thresholds are
 rejected. The strategy can stop at a local optimum and does not perform
@@ -293,7 +293,7 @@ uv run python main.py --dry-run --max-trials 40 --seed 7 --noise 0.03 --output /
 uv run python main.py --dry-run --manifest examples/dry_run_manifest.json --sim-model my-model.json
 ```
 
-默认使用当前入口的 `HeuristicSearchV2`，通过真实 `SearchLoop` 执行配置生成、
+默认使用当前入口的 `HeuristicSearch`，通过真实 `SearchLoop` 执行配置生成、
 模拟 launch/benchmark、observe、候选更新、finalize 和 serve 流程。每轮配置打印到
 终端；`dry-run-report.json` 保存完整扁平 metrics、summary、OOM、候选、覆盖率、
 状态及模型假设。报告显式标记 `simulated`；仅模拟验证阶段的 serve 协议，不执行 verify
@@ -359,7 +359,7 @@ uv run python main.py --dry-run --log-level DEBUG --output /tmp/search.json
 终端日志与下面的 JSONL 决策日志分别输出。
 
 检查平台指标读取时，INFO 日志中的 `platform benchmark_id=...` 会输出平台返回的
-完整 `metrics` 和 `summary`；V2 的 `Decision ... observation` 输出实际参与决策的
+完整 `metrics` 和 `summary`；策略的 `Decision ... observation` 输出实际参与决策的
 约束指标、目标值、平台/本地可行性、缺失或无效指标、相对违规程度及此前中心点。
 `proposal` 输出所参考的中心点指标和预测值，`outcome` 输出中心点、最优点和搜索半径。
 目标值读取自 `summary.objective_value`，约束指标按 `metrics` 中完整扁平键名读取，
@@ -370,7 +370,7 @@ JSONL 观测也保存 `raw_metrics`、`metric_context`、此前中心指标和�
 
 ## 本地决策日志
 
-当前 `main.py` 使用的 V2 策略在在线运行和 dry run 时都会追加写入
+当前 `main.py` 使用的启发式策略在在线运行和 dry run 时都会追加写入
 `logs/decisions.jsonl`，每行一个 JSON 对象。可自定义位置：
 
 ```bash
@@ -391,5 +391,4 @@ uv run python main.py --dry-run --decision-log /tmp/decisions.jsonl
 每条记录写完即关闭文件；中途退出可能留下尚无结果的提案。容量重试不会生成
 新决策记录。非有限数值保存为 `null`；写入失败会输出错误但不终止搜索。
 默认 `logs/` 已被 Git 忽略。容器中需将日志路径指向挂载目录才能在容器删除后保留。
-直接实例化 `HeuristicSearchV2` 时，可传入 `decision_log=DecisionLog(path)` 启用；
-V1 和随机策略未接入这份决策日志。
+直接实例化 `HeuristicSearch` 时，可传入 `decision_log=DecisionLog(path)` 启用；

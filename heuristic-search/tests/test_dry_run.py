@@ -6,7 +6,7 @@ import pytest
 from autotune_policy import SearchLoop
 from autotune_policy.dry_run import SLO, TPM, TTFT, DryRunPlatform, MetricSimulator
 from main import main
-from strategies.heuristic_search import HeuristicSearchV2
+from strategies.heuristic_search import HeuristicSearch
 
 
 @pytest.fixture
@@ -55,7 +55,7 @@ def test_unknown_metrics_fail_explicitly(manifest):
 
 def test_full_search_records_repairs_and_releases_engines(manifest):
     platform = DryRunPlatform(manifest)
-    strategy = HeuristicSearchV2(workload="agent", max_trials=24, safety_margin=0)
+    strategy = HeuristicSearch(workload="agent", max_trials=24, safety_margin=0)
     assert SearchLoop(strategy, sleep=lambda _: None).run(platform) == 0
     assert len(platform.trace) == len(strategy.observations) == 24
     assert platform.trace[0]["summary"]["feasible"] is False
@@ -69,7 +69,7 @@ def test_full_search_records_repairs_and_releases_engines(manifest):
 
 def test_no_feasible_contender_still_exits(manifest):
     platform = DryRunPlatform(manifest, model={"oom_pressure": 0.01})
-    assert SearchLoop(HeuristicSearchV2(max_trials=3)).run(platform) == 0
+    assert SearchLoop(HeuristicSearch(max_trials=3)).run(platform) == 0
     assert platform.finished and not platform.contenders
     assert len(platform.trace) == 3
 

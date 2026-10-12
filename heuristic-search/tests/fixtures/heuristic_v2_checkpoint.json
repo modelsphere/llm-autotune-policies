@@ -1,0 +1,236 @@
+{
+  "manifest": {
+    "contract": {
+      "version": "1.1"
+    },
+    "session_id": 17,
+    "campaign_id": 42,
+    "policy": {
+      "name": "random-search",
+      "image": "reg/random:0.1.0",
+      "version": "0.1.0"
+    },
+    "model": {
+      "engine": "sglang",
+      "image": "reg/sglang:v1",
+      "model_path": "/model",
+      "served_model_name": "m",
+      "extra_env": {},
+      "extra_volumes": {}
+    },
+    "hardware": {
+      "machine": "gpu-01",
+      "gpu_type": "H100",
+      "gpu_indices": [
+        0,
+        1
+      ],
+      "ports": [
+        28200,
+        28201
+      ],
+      "gpus_visible_in_container": true
+    },
+    "objective": {
+      "screen": {
+        "target_metric": "perf.output_tpm_card_norm",
+        "direction": "max",
+        "redlines": [
+          {
+            "metric": "ttft",
+            "op": "<",
+            "value": 8
+          }
+        ]
+      }
+    },
+    "search_space": {
+      "grid": {
+        "max_running_requests": [
+          16,
+          32,
+          48,
+          64,
+          80,
+          96
+        ]
+      }
+    },
+    "space_policy": {
+      "deviations": "allowed_if_declared"
+    },
+    "production": {
+      "engine_args": {},
+      "launch_command": ""
+    },
+    "time": {
+      "started_at": null,
+      "search_deadline": null,
+      "hard_deadline": null,
+      "heartbeat_interval_s": 30,
+      "heartbeat_timeout_s": 180,
+      "tick_s": 10
+    },
+    "contenders": {
+      "max": 2,
+      "validation_suite": "verify",
+      "approx_minutes_each": 60
+    },
+    "services": {
+      "launch": true,
+      "benchmarks": {
+        "screen": {
+          "slug": "s",
+          "approx_minutes": 5
+        }
+      },
+      "state": true
+    },
+    "prior": {
+      "contenders": []
+    }
+  },
+  "checkpoint": {
+    "strategy": "k3-heuristic-v2",
+    "context": "{\"constraints\":[{\"metric\":\"ttft\",\"op\":\"<\",\"value\":8}],\"max_step\":4,\"safety_margin\":0.05,\"v1\":\"{\\\"baseline\\\":{},\\\"hardware\\\":{\\\"gpu_indices\\\":[0,1],\\\"gpu_type\\\":\\\"H100\\\",\\\"gpus_visible_in_container\\\":true,\\\"machine\\\":\\\"gpu-01\\\",\\\"ports\\\":[28200,28201]},\\\"model\\\":{\\\"engine\\\":\\\"sglang\\\",\\\"extra_env\\\":{},\\\"extra_volumes\\\":{},\\\"image\\\":\\\"reg/sglang:v1\\\",\\\"model_path\\\":\\\"/model\\\",\\\"served_model_name\\\":\\\"m\\\"},\\\"objective\\\":{\\\"screen\\\":{\\\"direction\\\":\\\"max\\\",\\\"redlines\\\":[{\\\"metric\\\":\\\"ttft\\\",\\\"op\\\":\\\"<\\\",\\\"value\\\":8}],\\\"target_metric\\\":\\\"perf.output_tpm_card_norm\\\"}},\\\"space\\\":{\\\"grid\\\":{\\\"max_running_requests\\\":[16,32,48,64,80,96]}},\\\"workload\\\":\\\"agent\\\"}\"}",
+    "version": 2,
+    "seed": {
+      "max_running_requests": 32
+    },
+    "session_id": 17,
+    "min_improvement": 0.01,
+    "seen": [
+      "{\"max_running_requests\":16}",
+      "{\"max_running_requests\":32}",
+      "{\"max_running_requests\":48}"
+    ],
+    "observations": [
+      {
+        "config": {
+          "max_running_requests": 32
+        },
+        "objective": 132,
+        "feasible": true,
+        "failure_class": "",
+        "trial_id": null,
+        "error": "",
+        "raw": {
+          "metrics": {
+            "ttft": 6
+          }
+        }
+      },
+      {
+        "config": {
+          "max_running_requests": 48
+        },
+        "objective": 148,
+        "feasible": false,
+        "failure_class": "",
+        "trial_id": null,
+        "error": "",
+        "raw": {
+          "metrics": {
+            "ttft": 9
+          }
+        }
+      }
+    ],
+    "best": {
+      "config": {
+        "max_running_requests": 32
+      },
+      "objective": 132,
+      "feasible": true,
+      "failure_class": "",
+      "trial_id": null,
+      "error": "",
+      "raw": {
+        "metrics": {
+          "ttft": 6
+        }
+      }
+    },
+    "anchor": {
+      "max_running_requests": 32
+    },
+    "pending": [
+      [
+        {
+          "max_running_requests": 48
+        },
+        "coarse: max_running_requests; step=1; local prediction"
+      ]
+    ],
+    "phase": "coarse",
+    "reason": "coarse: max_running_requests; step=-1; local prediction",
+    "done": false,
+    "proposed": 3,
+    "inflight": {
+      "max_running_requests": 16
+    },
+    "center": {
+      "config": {
+        "max_running_requests": 32
+      },
+      "objective": 132,
+      "feasible": true,
+      "failure_class": "",
+      "trial_id": null,
+      "error": "",
+      "raw": {
+        "metrics": {
+          "ttft": 6
+        }
+      }
+    },
+    "samples": [
+      [
+        {
+          "max_running_requests": 32
+        },
+        {
+          "config": {
+            "max_running_requests": 32
+          },
+          "objective": 132,
+          "feasible": true,
+          "failure_class": "",
+          "trial_id": null,
+          "error": "",
+          "raw": {
+            "metrics": {
+              "ttft": 6
+            }
+          }
+        }
+      ],
+      [
+        {
+          "max_running_requests": 48
+        },
+        {
+          "config": {
+            "max_running_requests": 48
+          },
+          "objective": 148,
+          "feasible": false,
+          "failure_class": "",
+          "trial_id": null,
+          "error": "",
+          "raw": {
+            "metrics": {
+              "ttft": 9
+            }
+          }
+        }
+      ]
+    ],
+    "radius": {
+      "0": 2
+    }
+  },
+  "next_config": {
+    "max_running_requests": 16
+  }
+}

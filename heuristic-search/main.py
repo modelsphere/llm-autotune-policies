@@ -9,7 +9,7 @@ from pathlib import Path
 
 from autotune_policy import SearchLoop, __version__, run_policy
 from autotune_policy.decision_log import DecisionLog
-from strategies.heuristic_search import HeuristicSearchV2
+from strategies.heuristic_search import HeuristicSearch
 
 
 def main(argv=None) -> int:
@@ -26,7 +26,7 @@ def main(argv=None) -> int:
     parser.add_argument("--max-trials", type=int, default=24)
     parser.add_argument("--output", type=Path, default=Path("dry-run-report.json"))
     parser.add_argument("--decision-log", type=Path, default=Path("logs/decisions.jsonl"),
-                        help="Append local V2 decision records as JSON Lines")
+                        help="Append local decision records as JSON Lines")
     args = parser.parse_args(argv)
     if args.log_level not in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"):
         parser.error("Invalid AUTOTUNE_LOG_LEVEL")
@@ -37,11 +37,11 @@ def main(argv=None) -> int:
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
     logging.getLogger(__name__).info(
-        "Policy starting: strategy=HeuristicSearchV2 mode=%s max_trials=%s decision_log=%s",
+        "Policy starting: strategy=HeuristicSearch mode=%s max_trials=%s decision_log=%s",
         "dry-run" if args.dry_run else "online", args.max_trials, args.decision_log,
     )
 
-    strategy = HeuristicSearchV2(
+    strategy = HeuristicSearch(
         workload="agent",
         max_trials=args.max_trials,
         min_improvement=0.01,
