@@ -111,7 +111,7 @@ class SearchLoop:
                 hb = self._search_once(client, manifest)
         except SessionOver:
             raise  # the platform is done with us — a clean exit, not an error
-        except Exception as exc:  # noqa: BLE001 — surface ANY strategy bug as a signal
+        except Exception as exc:  # surface ANY strategy bug as a signal
             # A crash in the search logic is not silent death: tell the platform
             # we gave up (so it finalizes and validates what we already found)
             # rather than making it wait out the heartbeat timeout.
