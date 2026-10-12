@@ -14,6 +14,7 @@ loop's and the strategy's job.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 import urllib.error
@@ -23,6 +24,7 @@ from typing import Any
 
 CONTRACT_VERSION = "1.1"
 _BASE_PATH = "/api/policy/v1"
+logger = logging.getLogger(__name__)
 
 
 class PolicyError(Exception):
@@ -115,7 +117,10 @@ class PolicyClient:
                 return self._attempt(method, path, body, idempotency_key)
             except PolicyError as exc:
                 if exc.status in _TRANSIENT and attempt < self._retries:
-                    self._sleep(min(self._backoff * (2 ** attempt), self._backoff_cap))
+                    delay = min(self._backoff * (2 ** attempt), self._backoff_cap)
+                    logger.warning("API %s %s: status=%s; retry %s/%s in %ss",
+                                   method, path, exc.status, attempt + 1, self._retries, delay)
+                    self._sleep(delay)
                     attempt += 1
                     continue
                 raise

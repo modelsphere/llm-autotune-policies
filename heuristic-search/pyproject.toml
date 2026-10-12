@@ -1,0 +1,16 @@
+[project]
+name = "autotune-policy-heuristic-search"
+version = "0.1.0"
+description = "Constraint-aware heuristic search policy for LLM AutoTune."
+requires-python = ">=3.10"
+dependencies = []  # the SDK is stdlib-only on purpose
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

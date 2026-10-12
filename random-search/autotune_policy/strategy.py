@@ -19,7 +19,16 @@ class TrialResult:
 
     ``objective`` is the platform's own ``objective_value`` on the screen suite
     — the campaign's metric, already reduced for you, so you never reimplement
-    scoring. A failed launch (OOM, bad config, crash) also arrives here, with
+    scoring. ``raw`` is the complete GET /api/policy/v1/benchmarks/{id}
+    response: {"status": "succeeded", "summary": {"objective_value": ...,
+    "feasible": ..., "constraints": [...], "breaches": [...]}, "metrics": {...}}.
+    ``raw["metrics"]`` has literal flattened keys (e.g. "perf_guidellm_sweep.ttft_p99");
+    dots do not denote nested objects. Manifest redlines live under
+    objective.screen.redlines and objective.verify.redlines as lists of
+    {"metric": ..., "op": ..., "value": ...}. SearchLoop measures screen;
+    verify is a separate platform validation stage.
+
+    A failed launch (OOM, bad config, crash) also arrives here, with
     ``objective=None`` and a ``failure_class``: that is a signal to learn from,
     not an error to swallow.
     """
