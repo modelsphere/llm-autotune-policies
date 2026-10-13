@@ -34,7 +34,7 @@ def test_local_search_improves_and_stops_without_cartesian_sweep(direction):
     assert len(measured) < 25
 
 
-def test_tied_conditions_and_fixed_topology_are_preserved():
+def test_tied_conditions_and_declared_topology_are_preserved():
     strategy = HeuristicSearch(max_trials=12, baseline={"tp_size": 2})
     strategy.setup(manifest({
         "base": {"speculative_algorithm": "NONE"},
@@ -43,12 +43,14 @@ def test_tied_conditions_and_fixed_topology_are_preserved():
                   "max_running_requests": [16, 32, 64]}],
         "conditions": {"prefill_max_requests": {"speculative_algorithm": ["DSPARK"]}},
     }))
-    assert "tp_size" not in strategy.plan()["tuning"]
+    assert "tp_size" in strategy.plan()["tuning"]
+    topologies = set()
     while (config := strategy.next_config()) is not None:
-        assert config["tp_size"] == 2
+        topologies.add(config["tp_size"])
         assert "prefill_max_requests" not in config
         assert config["chunked_prefill_size"] == config["max_running_requests"] * 128
         strategy.observe(TrialResult(config, 1.0, True))
+    assert topologies == {1, 2}
 
 
 def test_oom_repairs_lower_neighbor_and_excludes_failure_from_contenders():
@@ -121,15 +123,20 @@ def test_offset_range_values_stay_on_declared_grid():
     assert set(measured) == {0.75, 0.85, 0.95}
 
 
-def test_unknown_tied_column_locks_whole_group():
+def test_unlisted_tied_column_does_not_lock_group():
     strategy = HeuristicSearch()
     strategy.setup(manifest({"tied": [{
         "max_running_requests": [16, 32], "tp_size": [1, 2],
     }]}))
-    assert strategy.plan()["tuning"] == []
-    config = strategy.next_config()
-    strategy.observe(TrialResult(config, 1.0, True))
-    assert strategy.next_config() is None
+    assert strategy.plan()["tuning"] == ["max_running_requests", "tp_size"]
+    measured = []
+    while (config := strategy.next_config()) is not None:
+        measured.append(config)
+        strategy.observe(TrialResult(config, 1.0, True))
+    assert {tuple(sorted(c.items())) for c in measured} == {
+        (("max_running_requests", 16), ("tp_size", 1)),
+        (("max_running_requests", 32), ("tp_size", 2)),
+    }
 
 
 def test_oom_does_not_treat_disabling_chunking_as_memory_reduction():
@@ -139,3 +146,39 @@ def test_oom_does_not_treat_disabling_chunking_as_memory_reduction():
     strategy.observe(TrialResult(config, None, False, failure_class="oom"))
     assert all(candidate["chunked_prefill_size"] > 0
                for candidate, reason in strategy.pending if reason.startswith("OOM"))
+
+
+def test_profile_only_prioritizes_axes_and_preserves_unlisted_order():
+    strategy = HeuristicSearch()
+    strategy.setup(manifest({
+        "base": {"fixed": 7},
+        "grid": {"custom_first": [0, 1], "singleton": [5],
+                 "custom_second": [0, 1], "max_running_requests": [32, 64],
+                 "mamba_full_memory_ratio": [0.5, 0.8]},
+        "range": {"custom_range": {"min": 0, "max": 1, "step": 1}},
+    }))
+    measured = []
+    while (config := strategy.next_config()) is not None:
+        measured.append(config)
+        assert config["fixed"] == 7 and config["singleton"] == 5
+        strategy.observe(TrialResult(config, 1.0, True))
+    baseline = measured[0]
+    changes = [[k for k in config if config[k] != baseline[k]] for config in measured[1:]]
+    assert changes == [["mamba_full_memory_ratio"], ["max_running_requests"],
+                       ["custom_first"], ["custom_second"], ["custom_range"]]
+
+
+def test_expanded_axes_reject_profile_filtered_checkpoint():
+    import json
+
+    spec = manifest({"grid": {"custom": [0, 1]}})
+    original = HeuristicSearch()
+    original.setup(spec)
+    state = original.dump_state()
+    state["context"] = json.loads(state["context"])["context"]
+    state["done"] = True
+    state["pending"] = []
+    restored = HeuristicSearch()
+    restored.setup(spec)
+    restored.load_state(state)
+    assert restored.next_config() == {"custom": 0}

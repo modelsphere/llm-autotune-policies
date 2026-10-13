@@ -40,16 +40,17 @@ run_policy(SearchLoop(HeuristicSearch(workload="long_prefill", max_trials=24)))
 Profiles: `interactive`, `long_prefill`, `long_decode`, `agent` (default), `batch`, `mixed`.
 Profiles prioritize different operational parameters; they do not
 infer workload characteristics from a score or enable new engine features.
-Only supported knobs present in `search_space` are varied. Topology, backend,
-precision, cache mode and speculative decoding remain fixed. Validate those as
-separate recipes, including their compatibility with the deployed engine version.
+All multi-value axes declared in `search_space` are eligible for tuning. Profile
+parameters take priority; unlisted axes follow in declaration order. Keep topology,
+backend, precision or other parameters in `base` or singleton axes when they must
+remain fixed. The campaign defines which variations are valid.
 
 The initial point projects production arguments (optionally overridden with
 `baseline={...}`) onto declared values. For missing operational values it uses
 conservative seed hints; other dimensions use their first declared value. Supply
 a validated baseline, particularly `mamba_full_memory_ratio`: there is no universal
 memory-pool ratio. Unknown parameters outside the space are not copied in.
-Tied groups move atomically and are fixed if any column is not a supported knob.
+Tied groups move atomically and use their highest-priority column for ordering.
 Conditions are pruned before deduplication. Overlapping axes, empty domains and
 malformed ranges are rejected during setup.
 

@@ -1,7 +1,7 @@
-"""Workload-guided local search on a fixed, validated topology.
+"""Workload-prioritized local search over the declared search space.
 
-Only declared operational knobs are varied. Precision, topology, speculative
-decoding and backend selection belong in separately validated campaign recipes.
+All declared multi-value axes may vary. Workload profiles only prioritize axes;
+parameters that must stay fixed belong in the search space base or singleton axes.
 No telemetry is inferred from an opaque objective value.
 
 Platform interface::
@@ -62,8 +62,7 @@ PROFILES = {
 }
 COMMON = ("mem_fraction_static", "schedule_conservativeness")
 # Seeds only; they are projected onto declared values, never added as extras.
-DEFAULTS = {"max_running_requests": 32, "chunked_prefill_size": 4096,
-            "prefill_max_requests": 4, "mem_fraction_static": 0.85,
+DEFAULTS = {"chunked_prefill_size": 4096, "mem_fraction_static": 0.85,
             "cuda_graph_max_bs_decode": 32, "schedule_conservativeness": 1.0}
 
 
@@ -128,8 +127,9 @@ class HeuristicSearch(Strategy):
         priority = list(dict.fromkeys((*PROFILES[self.workload], *COMMON)))
         self.tunable = sorted(
             [i for i, rows in enumerate(self.axes)
-             if len(rows) > 1 and all(k in priority for k in rows[0])],
-            key=lambda i: min(priority.index(k) for k in self.axes[i][0]),
+             if len(rows) > 1],
+            key=lambda i: min(priority.index(k) if k in priority else len(priority)
+                              for k in self.axes[i][0]),
         )
         preferred = dict(DEFAULTS)
         preferred.update((manifest.get("production") or {}).get("engine_args") or {})
@@ -157,6 +157,10 @@ class HeuristicSearch(Strategy):
         if self.pruning_threshold != 0.1:
             self.context = canonical_key({"context": self.context,
                                           "pruning_threshold": self.pruning_threshold})
+        # Old checkpoints may have exhausted a smaller, profile-filtered space.
+        if any(k not in priority for i in self.tunable for k in self.axes[i][0]):
+            self.context = canonical_key({"context": self.context,
+                                          "axis_policy": "all-declared-v1"})
         self.center: TrialResult | None = None
         self.samples: list[tuple[dict, TrialResult]] = []
         self.direction_blocks: list[dict] = []
@@ -391,8 +395,7 @@ class HeuristicSearch(Strategy):
 
     def load_state(self, blob: dict) -> None:
         # Accept the previous V2 identifier only when reading existing checkpoints.
-        if (blob.get("strategy") not in (self.state_strategy, "k3-heuristic-v2")
-                or blob.get("context") != self.context):
+        if (blob.get("strategy") != self.state_strategy or blob.get("context") != self.context):
             return
         if blob.get("version") != 2 or blob.get("min_improvement") != self.min_improvement:
             return

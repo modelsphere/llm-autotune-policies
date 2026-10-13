@@ -159,7 +159,7 @@ def test_other_axis_changes_do_not_supply_a_slope():
     assert obj._predict({"max_running_requests": 64, "chunked_prefill_size": 4096}, 0) is None
 
 
-def test_tied_axes_fixed_topology_conditions_and_budget():
+def test_tied_axes_declared_topology_conditions_and_budget():
     obj = HeuristicSearch(max_trials=5, baseline={"tp_size": 2})
     obj.setup(manifest({"base": {"mode": "off"},
                         "grid": {"tp_size": [1, 2], "prefill_max_requests": [1, 2]},
@@ -168,7 +168,7 @@ def test_tied_axes_fixed_topology_conditions_and_budget():
                         "conditions": {"prefill_max_requests": {"mode": ["on"]}}}))
     configs = []
     while (config := obj.next_config()) is not None:
-        assert config["tp_size"] == 2
+        assert config["tp_size"] in (1, 2)
         assert "prefill_max_requests" not in config
         assert config["chunked_prefill_size"] == config["max_running_requests"] * 128
         configs.append(config)
