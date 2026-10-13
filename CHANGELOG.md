@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Changed
+- The SDK client retries an HTTP 500 as well as 502, 503 and 504, for about
+  75 seconds (8 retries, backoff capped at 15 s; it was 5 retries and about
+  23 s). A platform being upgraded answers 500 for a moment, and a policy that
+  gave up on it lost its session to a routine rollout.
 - The SDK's search loop logs each step at INFO: the start, the plan, every
   launch and its benchmark result, the platform's commands, and the exit. The
   platform saves a policy container's log when the session ends; a policy that

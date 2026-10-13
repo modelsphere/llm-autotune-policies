@@ -69,6 +69,40 @@ def test_a_gateway_error_during_a_restart_is_retried():
     assert calls["n"] == 2
 
 
+def test_a_500_while_the_platform_upgrades_is_ridden_out():
+    # A platform mid-upgrade answers 500 for a while (a new API ahead of its
+    # database, or the database restarting). A policy that gave up on the first
+    # one lost its session to a routine rollout.
+    calls = {"n": 0}
+    waited = []
+
+    def opener(req, timeout=None):
+        calls["n"] += 1
+        if calls["n"] <= 6:
+            raise _http_error(500)
+        return _Resp(b'{"id": 12, "status": "serving"}')
+
+    client = PolicyClient(
+        PolicyConfig(api_url="http://x", api_key="k", session_id=1),
+        opener=opener, sleep=waited.append,
+    )
+    assert client.get_launch(12)["status"] == "serving"
+    assert calls["n"] == 7
+
+
+def test_the_default_retries_outlast_a_rollout():
+    waited = []
+
+    def opener(req, timeout=None):
+        raise _http_error(500)
+
+    client = PolicyClient(PolicyConfig(api_url="http://x", api_key="k", session_id=1),
+                          opener=opener, sleep=waited.append)
+    with pytest.raises(PolicyError):
+        client.get_session()
+    assert sum(waited) >= 60  # pods restarting, migrations, a database restart
+
+
 def test_a_4xx_is_a_decision_and_is_never_retried():
     for code, exc_type in ((422, ConfigRejected), (429, NoCapacity)):
         calls = {"n": 0}
