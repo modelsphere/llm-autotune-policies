@@ -6,7 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `heuristic-search`: constraint-aware local search with strategy checkpoints,
+  an offline simulator, and local JSON Lines decision logs. Its image is built
+  in CI; automatic GHCR publishing remains limited to `random-search`.
+
 ### Changed
+- Launch and benchmark idempotency keys are scoped to a search-loop run to avoid
+  collisions after a process restart. In-flight launches remain memory-only and
+  are not resumed or reconciled by a restarted loop.
+- Rejected configurations are saved in the strategy checkpoint before the next
+  platform command, so an exit does not discard the rejection.
+- Heartbeats log at DEBUG; trial launch, benchmark result and release remain at
+  INFO. The heuristic policy defaults to INFO.
+- Offline simulation and decision logging live in `heuristic-search`, outside
+  the shared SDK.
 - The SDK client retries an HTTP 500 as well as 502, 503 and 504, for about
   75 seconds (8 retries, backoff capped at 15 s; it was 5 retries and about
   23 s). A platform being upgraded answers 500 for a moment, and a policy that

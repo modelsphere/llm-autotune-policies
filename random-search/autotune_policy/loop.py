@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import time
+from uuid import uuid4
 
 from . import space
 from .client import (
@@ -31,7 +32,7 @@ from .strategy import Strategy, TrialResult
 # One line per step, so the container's log says what the policy did: the
 # platform saves it when the session ends, and a policy that logs nothing
 # leaves an empty log behind.
-logger = logging.getLogger("autotune_policy")
+logger = logging.getLogger(__name__)
 
 _ACTIVE = "run"
 _DONE_LAUNCH = {"serving", "failed", "released"}
@@ -39,6 +40,13 @@ _DONE_BENCH = {"succeeded", "failed", "killed"}
 
 
 class SearchLoop:
+    """Run a strategy against the platform and persist its checkpoints.
+
+    Run-scoped idempotency keys prevent collisions with a previous process, but
+    in-flight launch tracking is memory-only: restarting does not resume or
+    reconcile existing launches, even when the strategy restores a checkpoint.
+    """
+
     def __init__(self, strategy: Strategy, *, sdk_version: str = "0.1.0",
                  sleep=time.sleep, poll_seconds: float | None = None):
         self.strategy = strategy
@@ -46,6 +54,7 @@ class SearchLoop:
         self._sleep = sleep
         self._poll_override = poll_seconds
         self._seq = 0
+        self._run_id = uuid4().hex
         self._active_launches: set[int] = set()
         self._poll = 30.0
         self._state_enabled = False
@@ -64,6 +73,7 @@ class SearchLoop:
 
     # -- entry point -----------------------------------------------------------
     def run(self, client: PolicyClient) -> int:
+        logger.info("Fetching session manifest")
         manifest = client.get_session()
         self._poll = self._poll_override or float(
             (manifest.get("time") or {}).get("heartbeat_interval_s") or 30
@@ -78,6 +88,7 @@ class SearchLoop:
             (manifest.get("time") or {}).get("search_deadline") or "no deadline",
         )
         self.strategy.setup(manifest)
+        logger.info("Strategy initialized; heartbeat interval=%ss", self._poll)
 
         hb = client.heartbeat(phase="starting", message="handshake", handshake={
             "sdk_version": self.sdk_version, "contract_version": CONTRACT_VERSION,
@@ -88,10 +99,12 @@ class SearchLoop:
                         notes=plan.get("notes", ""))
         logger.info("plan: tuning %s", ", ".join(plan.get("tuning", [])) or "nothing declared")
         self.strategy.load_state(client.get_state())
+        logger.info("Handshake, plan and state loading complete")
 
         try:
             while True:
                 command = hb.get("command", _ACTIVE)
+                logger.debug("Platform command=%s", command)
                 if command in ("exit", "abort"):
                     logger.info("platform says %s; releasing engines and exiting", command)
                     self._teardown(client)
@@ -147,12 +160,13 @@ class SearchLoop:
 
         try:
             launch = client.launch(engine_args=config, gpu_indices=gpus, port=port,
-                                   idempotency_key=f"{tag}-launch")
+                                   idempotency_key=f"{self._run_id}-{tag}-launch")
         except ConfigRejected as exc:
             logger.info("%s: rejected: %s", tag, exc)
             self._observed_configs.append(config)
             self.strategy.observe(TrialResult(config=config, objective=None, feasible=False,
                                               failure_class="bad_config", error=str(exc)))
+            self._refresh(client)
             return self._beat(client, "searching", f"{tag}: rejected ({exc})")
         except NoCapacity:
             # Transient: a just-released engine is still holding its port/cards.
@@ -168,6 +182,7 @@ class SearchLoop:
             return hb
 
         launch_id = launch["id"]
+        logger.info("Trial %s: launch_id=%s", tag, launch_id)
         self._active_launches.add(launch_id)
         launch, hb = self._wait(client, lambda: client.get_launch(launch_id), _DONE_LAUNCH,
                                 f"{tag}: launching")
@@ -192,7 +207,7 @@ class SearchLoop:
         # against it, not against what we asked for.
         canonical = launch.get("config") or config
         try:
-            bench = client.bench_launch(launch_id, suite="screen", idempotency_key=f"{tag}-bench")
+            bench = client.bench_launch(launch_id, suite="screen", idempotency_key=f"{self._run_id}-{tag}-bench")
         except PhaseError as exc:
             self._release(client, launch_id)
             return self._beat(client, "searching", f"{tag}: bench refused ({exc})")
@@ -201,6 +216,11 @@ class SearchLoop:
         logger.info("%s: launch %s serving; benchmark %s started", tag, launch_id, bench_id)
         bench, hb = self._wait(client, lambda: client.get_benchmark(bench_id), _DONE_BENCH,
                                f"{tag}: benchmarking")
+        logger.info(
+            "Trial %s: platform benchmark_id=%s trial_id=%s status=%s metrics=%r summary=%r",
+            tag, bench_id, bench.get("trial_id"), bench.get("status"),
+            bench.get("metrics"), bench.get("summary"),
+        )
         self._release(client, launch_id)
         # If the benchmark finished, record it — even if a stop command just
         # arrived, a measurement in hand is not one to throw away.
@@ -230,6 +250,7 @@ class SearchLoop:
 
     # -- finalize + validation -------------------------------------------------
     def _finalize(self, client: PolicyClient) -> dict:
+        logger.info("Finalizing search")
         self._teardown(client)
         self._refresh(client)  # last word on contenders before they freeze
         try:
@@ -245,6 +266,7 @@ class SearchLoop:
         the platform then health-checks and runs the full replay itself."""
         if contender_id is None:
             return
+        logger.info("Serving contender=%s port=%s", contender_id, port)
         spec = next((c for c in client.get_contenders() if c.get("id") == contender_id), None)
         if spec is None:
             client.event("error", f"serve: contender {contender_id} not found")
@@ -273,6 +295,7 @@ class SearchLoop:
         ``stop_on_command``, returns early so the caller can obey it."""
         while True:
             obj = poll()
+            logger.debug("%s: status=%s", message, obj.get("status"))
             hb = self._beat(client, "searching", message)
             if stop_on_command and hb.get("command") != _ACTIVE:
                 return obj, hb
@@ -286,8 +309,11 @@ class SearchLoop:
         # The heartbeat is the lifeline, but so is every other call: the client
         # rides out transient network blips and platform restarts on all of
         # them, so this is a plain call.
-        return client.heartbeat(phase=phase, message=message, progress=progress,
-                                status=status, coverage=coverage)
+        logger.debug("Heartbeat: phase=%s message=%s", phase, message)
+        hb = client.heartbeat(phase=phase, message=message, progress=progress,
+                              status=status, coverage=coverage)
+        logger.debug("Heartbeat response: command=%s", hb.get("command"))
+        return hb
 
     def _coverage(self) -> dict | None:
         """The self-reported coverage to attach to a heartbeat: whatever the
@@ -325,9 +351,11 @@ class SearchLoop:
             try:
                 client.put_state(self.strategy.dump_state())
             except PolicyError:
-                pass  # state is a convenience, never worth failing a night over
+                logger.warning("Failed to persist strategy state; restart may repeat trials",
+                               exc_info=True)
 
     def _release(self, client: PolicyClient, launch_id: int) -> None:
+        logger.info("Releasing launch_id=%s", launch_id)
         self._active_launches.discard(launch_id)
         try:
             client.release(launch_id)
