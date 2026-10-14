@@ -15,6 +15,7 @@ search requires no platform change at all.
 |---|---|
 | [`autotune_policy/`](autotune_policy/) | The SDK, and the copy of record — each policy directory vendors it verbatim, and CI checks they still match. Stdlib only. `run_policy(SearchLoop(your_strategy))` satisfies every MUST in the contract — liveness, the productivity watchdog, idempotency — so you write search logic, not protocol. |
 | [`random-search/`](random-search/) | The reference policy, and the fork-and-edit template. Random search over the declared space: the baseline any smarter policy should beat. |
+| [`tpe/`](tpe/) | TPE (Optuna's Tree-structured Parzen Estimator): proposes where earlier trials paid off and learns which configs fail, so a night's later trials are better spent than random draws. |
 | [`heuristic-search/`](heuristic-search/) | Constraint-aware heuristic search with bounded steps, warm starts, decision logs and offline simulation. |
 | [`chaos/`](chaos/) | Not a tuner. It emits common policy failures on demand (crash, wedge, idle, bad config, container death) via `CHAOS_SCENARIO`, to prove the platform handles a policy gone wrong. |
 
@@ -46,10 +47,11 @@ about the protocol.
 
 ## Using the published image
 
-`random-search` is published with every release, for amd64 and arm64:
+`random-search` and `tpe` are published with every release, for amd64 and arm64:
 
 ```text
-ghcr.io/modelsphere/llm-autotune-policy-random-search:0.1.1
+ghcr.io/modelsphere/llm-autotune-policy-random-search:<version>
+ghcr.io/modelsphere/llm-autotune-policy-tpe:<version>
 ```
 
 If your GPU nodes can pull from ghcr.io, register that image and skip the

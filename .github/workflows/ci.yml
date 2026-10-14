@@ -26,7 +26,7 @@ jobs:
       - name: The vendored SDKs are identical to the copy of record
         run: |
           fail=0
-          for policy in random-search chaos heuristic-search; do
+          for policy in random-search chaos heuristic-search tpe; do
             if ! diff -ru --exclude=__pycache__ autotune_policy "$policy/autotune_policy"; then
               echo "::error::$policy/autotune_policy has drifted from autotune_policy/"
               echo "::error::run scripts/sync-sdk.sh and commit the result"
@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        policy: [random-search, chaos, heuristic-search]
+        policy: [random-search, chaos, heuristic-search, tpe]
     defaults:
       run:
         working-directory: ${{ matrix.policy }}
@@ -75,8 +75,8 @@ jobs:
   image:
     # Each policy vendors the SDK, so its own directory is the build context.
     # Built on every push so a broken Dockerfile is caught in review. On a
-    # version tag, random-search is also published to ghcr.io for amd64 and
-    # arm64, so an install can register it without building anything; any
+    # version tag, random-search and tpe are also published to ghcr.io for
+    # amd64 and arm64, so an install can register them without building; any
     # policy still builds from source for a registry of your own (README.md,
     # "Building an image").
     runs-on: ubuntu-latest
@@ -86,9 +86,9 @@ jobs:
       packages: write
     strategy:
       matrix:
-        policy: [random-search, chaos, heuristic-search]
+        policy: [random-search, chaos, heuristic-search, tpe]
     env:
-      PUBLISH: ${{ startsWith(github.ref, 'refs/tags/v') && matrix.policy == 'random-search' }}
+      PUBLISH: ${{ startsWith(github.ref, 'refs/tags/v') && (matrix.policy == 'random-search' || matrix.policy == 'tpe') }}
       IMAGE: ghcr.io/${{ github.repository_owner }}/llm-autotune-policy-${{ matrix.policy }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
