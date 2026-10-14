@@ -1,0 +1,18 @@
+[project]
+name = "autotune-policy-tpe"
+version = "0.1.1"
+description = "TPE (Optuna) search policy for LLM AutoTune: proposes where earlier trials paid off, and learns where configs fail."
+requires-python = ">=3.10"
+# Optuna's samplers are deterministic per seed AND version: keep it pinned
+# below the next major so a restarted night re-proposes what it would have.
+dependencies = ["optuna>=4.9.0,<5"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

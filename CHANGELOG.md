@@ -9,7 +9,18 @@ All notable changes to this project are documented here. The format follows
 ### Added
 - `heuristic-search`: constraint-aware local search with strategy checkpoints,
   an offline simulator, and local JSON Lines decision logs. Its image is built
-  in CI; automatic GHCR publishing remains limited to `random-search`.
+  in CI; it is not published to GHCR.
+- `tpe/`: a TPE policy (Optuna's Tree-structured Parzen Estimator). It
+  proposes where earlier trials scored well and learns from config-induced
+  failures (OOM, bad config, a failed benchmark) as infeasible points, using
+  the platform's redline slacks as constraints. The observations are its
+  state: a restarted container or the next night replays them and carries on.
+  Once the model only finds tried configs, it measures what is left of a
+  small space instead of stopping early. Published on a version tag as
+  `ghcr.io/modelsphere/llm-autotune-policy-tpe:<version>`. Unlike
+  `random-search` it has dependencies (Optuna, numpy); the image installs
+  them from a hashed `requirements.txt`, and `PIP_INDEX_URL` points the build
+  at a mirror.
 
 ### Changed
 - Launch and benchmark idempotency keys are scoped to a search-loop run to avoid
