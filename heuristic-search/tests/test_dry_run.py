@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from autotune_policy import SearchLoop
-from autotune_policy.dry_run import SLO, TPM, TTFT, DryRunPlatform, MetricSimulator
+from dry_run import SLO, TPM, TTFT, DryRunPlatform, MetricSimulator
 from main import main
 from strategies.heuristic_search import HeuristicSearch
 

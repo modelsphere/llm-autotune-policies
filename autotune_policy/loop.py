@@ -32,15 +32,21 @@ from .strategy import Strategy, TrialResult
 # One line per step, so the container's log says what the policy did: the
 # platform saves it when the session ends, and a policy that logs nothing
 # leaves an empty log behind.
-logger = logging.getLogger("autotune_policy")
+logger = logging.getLogger(__name__)
 
 _ACTIVE = "run"
 _DONE_LAUNCH = {"serving", "failed", "released"}
 _DONE_BENCH = {"succeeded", "failed", "killed"}
-logger = logging.getLogger(__name__)
 
 
 class SearchLoop:
+    """Run a strategy against the platform and persist its checkpoints.
+
+    Run-scoped idempotency keys prevent collisions with a previous process, but
+    in-flight launch tracking is memory-only: restarting does not resume or
+    reconcile existing launches, even when the strategy restores a checkpoint.
+    """
+
     def __init__(self, strategy: Strategy, *, sdk_version: str = "0.1.0",
                  sleep=time.sleep, poll_seconds: float | None = None):
         self.strategy = strategy
@@ -303,7 +309,7 @@ class SearchLoop:
         # The heartbeat is the lifeline, but so is every other call: the client
         # rides out transient network blips and platform restarts on all of
         # them, so this is a plain call.
-        logger.info("Heartbeat: phase=%s message=%s", phase, message)
+        logger.debug("Heartbeat: phase=%s message=%s", phase, message)
         hb = client.heartbeat(phase=phase, message=message, progress=progress,
                               status=status, coverage=coverage)
         logger.debug("Heartbeat response: command=%s", hb.get("command"))

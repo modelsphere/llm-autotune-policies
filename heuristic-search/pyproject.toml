@@ -1,6 +1,6 @@
 [project]
 name = "autotune-policy-heuristic-search"
-version = "0.1.0"
+version = "0.1.1"
 description = "Constraint-aware heuristic search policy for LLM AutoTune."
 requires-python = ">=3.10"
 dependencies = []  # the SDK is stdlib-only on purpose

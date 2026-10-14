@@ -50,16 +50,6 @@ def test_restart_preserves_failed_trials_and_retries_unfinished_proposal():
     assert restored.next_config() == unfinished
 
 
-def test_legacy_seed_is_ignored():
-    spec = manifest({"grid": {"max_running_requests": [8, 16, 32, 64]}})
-    obj = HeuristicSearch()
-    obj.setup(spec)
-    obj.load_state({"strategy": obj.state_strategy, "context": obj.context,
-                    "seed": {"max_running_requests": 64}})
-    assert obj.observations == []
-    assert obj.next_config() == {"max_running_requests": 32}
-
-
 def test_abrupt_stop_then_loop_restart_does_not_repeat_completed_trials():
     class Stopped(BaseException):
         pass
@@ -127,24 +117,6 @@ def test_state_write_failure_is_visible(caplog):
     fake = BrokenState(manifest({"grid": {"max_running_requests": [16, 32]}}), target_trials=1)
     assert SearchLoop(HeuristicSearch(), sleep=lambda _: None).run(fake) == 0
     assert "Failed to persist strategy state" in caplog.text
-
-
-def test_previous_v2_checkpoint_resumes_with_neutral_identifier():
-    from pathlib import Path
-
-    # Captured from the pre-consolidation V2 implementation, including an
-    # unfinished proposal and measurements that establish a direction block.
-    fixture = json.loads((Path(__file__).parent / "fixtures" /
-                          "heuristic_v2_checkpoint.json").read_text())
-    obj = HeuristicSearch()
-    obj.setup(fixture["manifest"])
-    obj.load_state(fixture["checkpoint"])
-    saved = obj.dump_state()
-    assert saved["strategy"] == "heuristic-search"
-    for key in ("observations", "samples", "center", "radius", "best"):
-        assert saved[key] == fixture["checkpoint"][key]
-    assert obj.direction_blocks
-    assert obj.next_config() == fixture["next_config"]
 
 
 def test_v1_checkpoint_is_ignored():

@@ -41,7 +41,7 @@ def test_unwritable_log_does_not_abort_search(tmp_path, caplog):
 
 
 def test_nonfinite_metrics_are_valid_json(tmp_path):
-    from autotune_policy.decision_log import DecisionLog
+    from decision_log import DecisionLog
 
     path = tmp_path / "decisions.jsonl"
     DecisionLog(path)({"event": "observation", "metrics": {"latency": float("inf")}})

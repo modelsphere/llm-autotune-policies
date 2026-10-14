@@ -148,7 +148,7 @@ class HeuristicSearch(Strategy):
         # The campaign manifest is the single source of truth for SLOs.
         self.constraints = self.screen_redlines
         self.required_metrics = {spec["metric"] for spec in self.constraints}
-        # Retain the historical context envelope to accept existing V2 checkpoints.
+        # Keep the V2 context envelope stable for current-identifier checkpoints.
         self.context = canonical_key({"v1": self.context, "constraints": self.constraints,
                                       "safety_margin": self.safety_margin,
                                       "max_step": self.max_step})
@@ -394,7 +394,7 @@ class HeuristicSearch(Strategy):
         }
 
     def load_state(self, blob: dict) -> None:
-        # Accept the previous V2 identifier only when reading existing checkpoints.
+        # Restore only checkpoints written with the current strategy identifier.
         if (blob.get("strategy") != self.state_strategy or blob.get("context") != self.context):
             return
         if blob.get("version") != 2 or blob.get("min_improvement") != self.min_improvement:

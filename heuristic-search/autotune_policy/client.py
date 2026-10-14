@@ -77,11 +77,14 @@ class PolicyConfig:
         return cls(api_url=url, api_key=key, session_id=int(sid))
 
 
-# Failures worth retrying: a network blip (status 0, from URLError) and the
-# gateway errors a platform restart shows through a proxy. A 4xx is a decision
-# (auth, phase, safety, capacity) that a retry cannot change, so it is never
-# retried — the loop handles 429 with its own backoff.
-_TRANSIENT = frozenset({0, 502, 503, 504})
+# Failures worth retrying: a network blip (status 0, from URLError), the
+# gateway errors a platform restart shows through a proxy, and a 500, which is
+# what a platform answers while it is being upgraded (a new API before its
+# database, or its database restarting). Retrying is safe: the POSTs that create
+# work carry an Idempotency-Key. A 4xx is a decision (auth, phase, safety,
+# capacity) that a retry cannot change, so it is never retried — the loop
+# handles 429 with its own backoff.
+_TRANSIENT = frozenset({0, 500, 502, 503, 504})
 
 
 class PolicyClient:
@@ -95,7 +98,7 @@ class PolicyClient:
     """
 
     def __init__(self, config: PolicyConfig, *, timeout: float = 30.0, opener=None,
-                 retries: int = 5, backoff: float = 1.0, backoff_cap: float = 8.0,
+                 retries: int = 8, backoff: float = 1.0, backoff_cap: float = 15.0,
                  sleep=time.sleep):
         self.config = config
         self._base = config.api_url + _BASE_PATH

@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 
 from autotune_policy import SearchLoop, __version__, run_policy
-from autotune_policy.decision_log import DecisionLog
+from decision_log import DecisionLog
 from strategies.heuristic_search import HeuristicSearch
 
 
@@ -17,8 +17,8 @@ def main(argv=None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--log-level", type=str.upper,
                         choices=("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
-                        default=os.environ.get("AUTOTUNE_LOG_LEVEL", "DEBUG").upper(),
-                        help="Console log level (default: AUTOTUNE_LOG_LEVEL or DEBUG)")
+                        default=os.environ.get("AUTOTUNE_LOG_LEVEL", "INFO").upper(),
+                        help="Console log level (default: AUTOTUNE_LOG_LEVEL or INFO)")
     parser.add_argument("--manifest", type=Path, help="Dry-run platform manifest JSON")
     parser.add_argument("--sim-model", type=Path, help="Dry-run response model overrides JSON")
     parser.add_argument("--seed", type=int, default=0)
@@ -51,7 +51,7 @@ def main(argv=None) -> int:
     )
 
     if args.dry_run:
-        from autotune_policy.dry_run import DryRunPlatform
+        from dry_run import DryRunPlatform
 
         manifest_path = args.manifest or Path(__file__).parent / "examples/dry_run_manifest.json"
         manifest = json.loads(manifest_path.read_text())

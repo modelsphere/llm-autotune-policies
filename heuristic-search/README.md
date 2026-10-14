@@ -2,8 +2,8 @@
 
 The entrypoint runs the single `HeuristicSearch` class in
 `strategies/heuristic_search.py`. It preserves the constraint-aware search behavior
-and accepts existing V2 checkpoints. New checkpoints use the model-neutral
-`heuristic-search` identifier; V1 and seed-only checkpoints are not supported.
+and restores V2 checkpoints with the model-neutral `heuristic-search` identifier.
+Older strategy identifiers, V1 and seed-only checkpoints are not supported.
 
 From this directory:
 
@@ -253,13 +253,15 @@ or clear its saved state when intentionally collecting fresh measurements.
 
 ```bash
 uv run --extra dev pytest      # a full night against an in-memory platform, no network
-uv run --extra dev ruff check autotune_policy/ strategies/ tests/
+uv run --extra dev ruff check .
 ```
 
-The bundled [`.gitlab-ci.yml`](.gitlab-ci.yml) runs exactly this on every push,
-and builds + pushes the image to harbor on a version tag. Because the fake night
-exercises the whole contract, a green check means a change to `strategies/`
-didn't break the protocol — change the algorithm freely.
+The repository's [GitHub Actions workflow](../.github/workflows/ci.yml) runs on
+pull requests, pushes to `main`, and version tags (`v*`). It checks SDK copy
+consistency, runs pytest and Ruff for all three policies, and builds their images.
+Only `random-search` is published to GHCR on version tags; `heuristic-search`
+is built for validation and can be built and pushed manually as described below.
+The fake night exercises the policy contract without a live platform or GPUs.
 
 ## Build & run
 
@@ -308,7 +310,7 @@ uv run python main.py --dry-run --manifest examples/dry_run_manifest.json --sim-
 - 提高 chunk 或 prefill 并发：改善预填充效率，同时增加合成内存压力。
 - 提高静态显存占比：提高吞吐，但减少内存余量，可能触发模拟 OOM。
 - mamba 比例、CUDA graph batch、调度保守度也有显式指数假设，见
-  `autotune_policy/dry_run.py` 的 `DEFAULT_MODEL`。
+  `dry_run.py` 的 `DEFAULT_MODEL`。
 
 这些方向和量级是可修改的实验假设，不是硬件性能预测；不同负载下真实方向可能相反。
 默认不加噪声；`--noise 0.03` 表示每项连续指标独立乘以 ±3% 均匀噪声，固定 seed
@@ -340,16 +342,16 @@ manifest 的 production 配置改变。默认参数模型只接受正数，不�
 
 ## 终端日志
 
-默认以 DEBUG 级别输出到 stderr，包含启动、心跳阶段、试验结果、资源释放和网络重试；
+默认以 INFO 级别输出到 stderr，包含启动、试验启动、试验结果和资源释放；
 搜索循环异常会输出完整堆栈。Docker 会收集这些日志：
 
 ```bash
 docker logs -f <容器名或ID>
 ```
 
-镜像默认设置 `AUTOTUNE_LOG_LEVEL=DEBUG`，包含详细配置和轮询状态日志。
-可通过容器环境变量 `AUTOTUNE_LOG_LEVEL=INFO` 或启动参数 `--log-level INFO`
-减少输出，命令行参数优先。支持 DEBUG、INFO、WARNING、ERROR、CRITICAL。
+镜像默认设置 `AUTOTUNE_LOG_LEVEL=INFO`。
+可通过容器环境变量 `AUTOTUNE_LOG_LEVEL=DEBUG` 或启动参数 `--log-level DEBUG`
+开启详细配置、心跳和轮询状态日志，命令行参数优先。支持 DEBUG、INFO、WARNING、ERROR、CRITICAL。
 本地示例：
 
 ```bash
