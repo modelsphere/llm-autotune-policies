@@ -37,6 +37,9 @@ logger = logging.getLogger(__name__)
 _ACTIVE = "run"
 _DONE_LAUNCH = {"serving", "failed", "released"}
 _DONE_BENCH = {"succeeded", "failed", "killed"}
+# What a contender's launch_spec.environment carries (GET /launches/{id}/environment).
+_ENVIRONMENT_KEYS = ("engine_version", "torch_version", "cuda_version", "gpu_name",
+                     "image_digest", "card_type")
 
 
 class SearchLoop:
@@ -206,6 +209,7 @@ class SearchLoop:
         # Serving. The echoed config is the canonical truth — record trials
         # against it, not against what we asked for.
         canonical = launch.get("config") or config
+        environment = self._environment(client, launch_id)
         try:
             bench = client.bench_launch(launch_id, suite="screen", idempotency_key=f"{self._run_id}-{tag}-bench")
         except PhaseError as exc:
@@ -239,7 +243,9 @@ class SearchLoop:
                 failure_class=bench.get("failure_class", ""),
                 trial_id=bench.get("trial_id"),
                 error=bench.get("error", ""),
-                raw=bench,
+                # A benchmark does not say what its engine ran on; the launch
+                # does. Strategies fill a contender's `environment` from here.
+                raw={**bench, "environment": environment or bench.get("environment") or {}},
             ))
             self._refresh(client)
         if hb.get("command") != _ACTIVE:
@@ -288,6 +294,17 @@ class SearchLoop:
                          f"({launch.get('failure_class') or launch.get('status')})")
 
     # -- helpers ---------------------------------------------------------------
+    @staticmethod
+    def _environment(client: PolicyClient, launch_id: int) -> dict:
+        """The provenance a contender needs to be promotable, read off the
+        serving launch. Best effort: an older platform has no such endpoint,
+        and a missing environment never costs a trial."""
+        try:
+            env = client.launch_environment(launch_id) or {}
+        except PolicyError:
+            return {}
+        return {key: env[key] for key in _ENVIRONMENT_KEYS if env.get(key)}
+
     def _wait(self, client: PolicyClient, poll, done: set, message: str,
               *, stop_on_command: bool = True):
         """Poll ``poll()`` until its status is terminal, heartbeating each round.

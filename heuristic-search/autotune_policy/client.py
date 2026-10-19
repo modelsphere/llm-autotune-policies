@@ -192,6 +192,11 @@ class PolicyClient:
     def release(self, launch_id: int) -> dict:
         return self._request("DELETE", f"/launches/{launch_id}")
 
+    def launch_environment(self, launch_id: int) -> dict:
+        """What a serving launch actually runs on (contract 1.3): engine, torch
+        and CUDA versions, image digest, card. 404 on an older platform."""
+        return self._request("GET", f"/launches/{launch_id}/environment")
+
     # -- benchmarks ------------------------------------------------------------
     def bench_launch(self, launch_id: int, *, suite: str, idempotency_key: str) -> dict:
         return self._request("POST", f"/launches/{launch_id}/benchmarks",

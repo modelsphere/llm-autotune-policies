@@ -1,0 +1,31 @@
+{
+  "name": "llm-autotune-policy-agent",
+  "version": "0.1.0",
+  "description": "An LLM agent that tunes LLM serving engines through the LLM AutoTune policy contract",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.19"
+  },
+  "bin": {
+    "autotune-agent": "dist/src/main.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.json && node --test 'dist/test/**/*.test.js'",
+    "gen:contract": "openapi-typescript contract/policy-api.openapi.json -o src/contract/api.d.ts",
+    "licenses": "node scripts/licenses.mjs"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "1.3.0",
+    "@earendil-works/pi-ai": "1.3.0",
+    "typebox": "1.3.27"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.1",
+    "openapi-typescript": "7.10.1",
+    "typescript": "5.9.3"
+  }
+}

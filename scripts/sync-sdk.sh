@@ -16,6 +16,8 @@ for policy in */; do
   policy=${policy%/}
   [ "$policy" = autotune_policy ] && continue
   [ -f "$policy/Dockerfile" ] || continue
+  # Python policies vendor the SDK; the agent policy is TypeScript and has its own client.
+  [ -f "$policy/pyproject.toml" ] || continue
   rsync -a --delete --exclude='__pycache__' autotune_policy/ "$policy/autotune_policy/"
   echo "synced -> $policy/autotune_policy/"
 done

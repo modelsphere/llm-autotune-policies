@@ -97,13 +97,17 @@ class FakePlatform:
         self._seq += 1
         lid = self._seq
         self.launches[lid] = {"id": lid, "status": "serving", "config": dict(engine_args),
-                              "endpoint_url": f"http://x:{port}", "environment": {"engine_version": "1"}}
+                              "endpoint_url": f"http://x:{port}",
+                              "environment": {"engine_version": "1", "image_digest": "sglang@sha256:abc"}}
         if self.finalized_called:
             self.serving_launch_args.append(engine_args)
         return {"id": lid, "status": "queued"}
 
     def get_launch(self, launch_id):
         return self.launches[launch_id]
+
+    def launch_environment(self, launch_id):
+        return self.launches[launch_id].get("environment", {})
 
     def release(self, launch_id):
         self.launches[launch_id]["status"] = "released"
@@ -119,7 +123,7 @@ class FakePlatform:
             "id": bid, "status": "succeeded", "suite": suite, "trial_id": 900 + bid,
             "summary": {"objective_value": _objective(cfg), "feasible": True,
                         "constraints": [], "breaches": []},
-            "config": cfg, "environment": {"engine_version": "1"},
+            "config": cfg,
         }
         return {"id": bid, "status": "queued"}
 
@@ -178,6 +182,8 @@ def test_contenders_are_ranked_best_first_and_complete():
     top = rows[0]["launch_spec"]
     assert top["image"] == MANIFEST["model"]["image"]
     assert top["engine_args"], "a contender's launch_spec must carry a complete config"
+    # Read off the serving launch, not the benchmark: what makes a verdict promotable.
+    assert top["environment"] == {"engine_version": "1", "image_digest": "sglang@sha256:abc"}
 
 
 def test_the_served_contender_is_the_top_ranked_config():
