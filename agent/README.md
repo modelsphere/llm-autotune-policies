@@ -93,6 +93,17 @@ The campaign's forbidden-parameter list (Advanced → *Parameters the policy may
 not change*) is what keeps the model from "winning" by trading quality away —
 lower-precision KV cache, a shorter context, a dropped parser. Keep it on.
 
+## Check the endpoint first
+
+`dist/src/check.js` (also `autotune-agent-check`) sends one request through pi
+with a tool attached, using the same `LLM_*` variables, and prints what came
+back (never the key): whether the model answered with a tool call, whether it
+streamed reasoning, the latency. Exit 0 means tool calls work.
+
+```bash
+docker run --rm -e LLM_BASE_URL=… -e LLM_MODEL=… -e LLM_API_KEY=… <image> node dist/src/check.js
+```
+
 ## Develop and test
 
 ```bash
