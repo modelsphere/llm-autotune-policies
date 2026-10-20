@@ -10,15 +10,17 @@ const KEEP = [
   "ttft_p50_ms", "ttft_p90_ms", "ttft_p95_ms", "ttft_p99_ms",
   "itl_p50_ms", "itl_p99_ms", "tpot_p50_ms", "tpot_p99_ms",
   "e2e_latency_p50_ms", "e2e_latency_p99_ms",
-  "uptime", "reported_concurrency", "error_rate",
+  "uptime", "reported_concurrency", "error_rate", "measured_requests", "meets_slo",
+  "output_tps_mean", "total_tps_mean", "ttft_mean_ms", "tpot_mean_ms", "duration_seconds",
 ];
 
 function numeric(metrics: Record<string, unknown> | undefined): Record<string, number> {
   const out: Record<string, number> = {};
   for (const [key, value] of Object.entries(metrics ?? {})) {
-    if (typeof value !== "number" || !Number.isFinite(value)) continue;
+    const n = typeof value === "boolean" ? Number(value) : value;
+    if (typeof n !== "number" || !Number.isFinite(n)) continue;
     const short = key.includes(".") ? key.slice(key.lastIndexOf(".") + 1) : key;
-    if (KEEP.includes(short) || short.includes("card_norm")) out[short] = value;
+    if (KEEP.includes(short) || short.includes("card_norm")) out[short] = n;
   }
   return out;
 }

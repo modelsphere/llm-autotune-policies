@@ -9,7 +9,7 @@ GPU time is the scarce resource, not your tokens. Every minute a card sits idle,
 - You are woken with a `[lab event]` whenever a trial finishes, fails, or a slot frees up. When every slot is busy and you have nothing to analyze, end your turn (reply briefly without calling tools) — you will be woken.
 - Finalists are chosen by the harness: the best feasible configs by their mean measurement. Near the end it re-measures them. You cannot write scores; you produce evidence.
 - The production config was measured first as the **anchor**. Judge every result against it.
-- Read whether requests succeeded from the direct signals, not from latency: each level's `uptime` (the share of the level the service answered) and `error_rate`. The record marks a level with `REQUESTS FAILED`. A zero or tiny latency or throughput next to it is a symptom, not a finding; a config whose levels failed is broken however it scores. When the record lacks them for a level, say so instead of guessing.
+- Read whether requests succeeded from the direct signals, not from latency: each level's `uptime` (the share of the level the service answered), `measured_requests` (requests that completed inside the level) and `error_rate` when reported. The record marks a level with `REQUESTS FAILED`. A zero or tiny latency or throughput next to it is a symptom, not a finding; a config whose levels failed is broken however it scores. When the record lacks them for a level, say so instead of guessing.
 - `engine warnings` are lines the engine logged while serving (a disabled CUDA graph, a fallback kernel, a capped batch). They often explain a number before the log does; read the full log with `read_log` when one looks related.
 
 # Rules (the platform refuses violations)

@@ -81,7 +81,7 @@ function levelLine(t: Trial): string {
   if (!m || !m.levels.length) return "";
   // uptime and error_rate are the direct signals that a level served at all;
   // a latency of 0 or a tiny throughput is only a symptom of what they say.
-  const keys = ["output_tps", "ttft_p99_ms", "itl_p99_ms", "uptime", "error_rate"];
+  const keys = ["output_tps", "output_tps_mean", "ttft_p99_ms", "itl_p99_ms", "uptime", "measured_requests", "error_rate"];
   return m.levels
     .map((l) => `c${l.concurrency}: ${keys.filter((k) => k in l.metrics).map((k) => `${k.replace("_ms", "")} ${fmt(l.metrics[k])}`).join(", ")}`)
     .join(" | ");
@@ -92,8 +92,11 @@ export function unhealthyLevels(t: Trial): string[] {
   const m = t.measurements.at(-1);
   if (!m) return [];
   return m.levels
-    .filter((l) => (l.metrics.uptime !== undefined && l.metrics.uptime < 1) || (l.metrics.error_rate ?? 0) > 0)
-    .map((l) => `c${l.concurrency}${l.metrics.uptime !== undefined ? ` uptime ${fmt(l.metrics.uptime)}` : ""}${l.metrics.error_rate ? ` errors ${fmt(l.metrics.error_rate)}` : ""}`);
+    .filter((l) =>
+      (l.metrics.uptime !== undefined && l.metrics.uptime < 1) ||
+      (l.metrics.error_rate ?? 0) > 0 ||
+      l.metrics.measured_requests === 0)
+    .map((l) => `c${l.concurrency}${l.metrics.uptime !== undefined ? ` uptime ${fmt(l.metrics.uptime)}` : ""}${l.metrics.measured_requests === 0 ? " 0 requests completed" : ""}${l.metrics.error_rate ? ` errors ${fmt(l.metrics.error_rate)}` : ""}`);
 }
 
 function trialRow(t: Trial, anchorConfig: Trial["config"] | undefined, anchorValue: number | null, noise: number | null, direction: Direction): string {
