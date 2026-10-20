@@ -11,6 +11,9 @@ It is written in TypeScript on [pi](https://github.com/earendil-works/pi)
 (`@earendil-works/pi-agent-core` and `pi-ai`, MIT), and needs platform
 contract **1.3** (diagnostics, `POST /configs/check`, forbidden parameters).
 
+[DESIGN.md](DESIGN.md) has a diagram of the parts and how they fit, in plain
+words.
+
 ## How a night goes
 
 1. The production config is measured first, twice and side by side, as the
