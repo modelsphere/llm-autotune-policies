@@ -77,7 +77,7 @@ curl -X POST https://<autotune>/api/policies -H "X-API-Key: $KEY" \
 | `LLM_API_KEY` | none | Put it in `secret_env`. |
 | `LLM_REASONING` | `true` | Whether the model streams reasoning (`reasoning_content`). |
 | `LLM_THINKING` | `high` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. |
-| `LLM_CONTEXT_WINDOW` | `128000` | Tokens; the conversation is trimmed to fit, the record never. |
+| `LLM_CONTEXT_WINDOW` | `128000` | Tokens the agent may use per request — set it to what you want to pay for, up to the model's real window (a 1M-token model is usually best run at a few hundred thousand). The conversation is trimmed to fit, the record never. |
 | `LLM_MAX_OUTPUT_TOKENS` | `16000` | |
 | `LLM_COMPAT` | `{}` | JSON: pi-ai's [OpenAI compatibility flags](https://github.com/earendil-works/pi/tree/main/packages/ai#openai-compatibility-settings) for this endpoint, e.g. `{"thinkingFormat": "qwen-chat-template"}`. The defaults suit self-hosted servers (no `developer` role, no `reasoning_effort`). |
 | `AGENT_POLL_SECONDS` | `10` | How often launches and benchmarks are polled. |
