@@ -10,8 +10,9 @@ final word.
 
 ## The loop
 
-1. **What we know.** Before every decision the model gets a fresh summary of
-   the night: every result, every failure and its cause, the noise, its own
+1. **What the model sees.** Three layers, in this order: the rules and the
+   goal (fixed), the recent conversation, and the lab record — a fresh summary
+   of the night: every result, every failure and its cause, the noise, its own
    notes so far.
 2. **The model decides.** It explains what it thinks is going on and proposes
    configs to test it.
@@ -22,9 +23,12 @@ final word.
 
 ## Design choices
 
-- **The summary is rebuilt every turn, not remembered.** A long conversation
-  forgets or drifts; a summary rebuilt from the books cannot. Old chat can be
-  dropped, the summary never is, so nothing learned is lost.
+- **Memory lives in the books, not in the conversation.** A long
+  conversation forgets or drifts; a record rebuilt from the books every turn
+  cannot. When the conversation fills up, old turns are dropped (their long
+  reasoning first), but the model is first asked to write down anything it
+  learned, so what matters survives as a note in the books. The record itself
+  is never dropped.
 - **The model only gets experiment verbs.** Propose, check, read a log,
   measure again, write a note — no shell, no files. It spends its effort on
   tuning, not on operating a computer.
@@ -36,8 +40,9 @@ final word.
 - **Failures teach.** A failed launch is read and diagnosed, and becomes a
   constraint the model sees on every later turn, so the same mistake is not
   paid for twice.
-- **Nights build on each other.** Lessons and constraints are saved and shown
-  to the next night.
+- **Nights build on each other.** At the end, lessons, constraints and
+  settled questions are saved with the platform; the next night starts from
+  them instead of from zero.
 
 Built on [pi](https://github.com/earendil-works/pi), which runs the model and
 its tool calls; everything above is this package.
