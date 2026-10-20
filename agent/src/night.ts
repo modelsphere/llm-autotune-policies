@@ -20,7 +20,7 @@ import { buildModel, diagnose } from "./llm.js";
 import { applyMemory, loadMemory, snapshot } from "./memory.js";
 import { LabState, type Trial } from "./lab/state.js";
 import { diffText, sweptKeys } from "./lab/space.js";
-import { byConfig, deltaText, type Direction, noiseBand, ranking, trialObjective } from "./lab/stats.js";
+import { byConfig, deltaText, type Direction, noiseBand, ranking, trialObjective, anchorValue as anchorMean } from "./lab/stats.js";
 import { TrialRunner } from "./runner.js";
 import { buildTools } from "./tools.js";
 import { VERSION } from "./version.js";
@@ -104,7 +104,6 @@ class Night {
         pollMs: settings.pollMs,
         direction: this.direction,
         anomalyThreshold: settings.anomalyThreshold,
-        maxParallel: settings.maxParallel || undefined,
         suite: "screen",
       },
       {
@@ -173,7 +172,7 @@ class Night {
     });
     this.runner.pump();
     this.driver.start(
-      "The night begins. The production config is already queued as the anchor (#1). Read the lab record, open your first hypotheses, and propose enough configs to fill every free slot now. You will be woken whenever a trial finishes or a slot frees up.",
+      "The night begins. The production config is already queued as the anchor (#1), and again (#2) for the measurement noise. Read the lab record, open your first hypotheses, and propose enough configs to fill every free slot now. You will be woken whenever a trial finishes or a slot frees up.",
     );
 
     const command = await this.searchLoop();
@@ -280,7 +279,7 @@ class Night {
 
   private describe(trial: Trial): string {
     const anchor = this.lab.anchor;
-    const anchorValue = anchor ? trialObjective(anchor) : null;
+    const anchorValue = anchor ? anchorMean(this.lab.trials) : null;
     const value = trialObjective(trial);
     const noise = noiseBand(byConfig(this.lab.trials));
     let line = `Trial #${trial.id} (${trial.purpose}) ${trial.status}`;
@@ -318,7 +317,10 @@ class Night {
     for (const candidate of [production, {}]) {
       const check = await this.client.checkConfig(candidate);
       if (check.ok) {
-        this.lab.addTrial({ purpose: "anchor", config: check.config ?? {}, cards: check.cards ?? 0, rationale: "the production config, measured tonight as the reference" });
+        // Twice, side by side when the budget allows: the two give the noise
+        // every later delta is judged against, before anything else is.
+        const anchor = this.lab.addTrial({ purpose: "anchor", config: check.config ?? {}, cards: check.cards ?? 0, rationale: "the production config, measured tonight as the reference" });
+        this.lab.addTrial({ purpose: "remeasure", remeasureOf: anchor.id, config: anchor.config, cards: anchor.cards, rationale: "production again: the first estimate of the measurement noise" });
         return;
       }
       this.log(`anchor ${Object.keys(candidate).length ? "production config" : "base config"} refused: ${(check.problems ?? []).map((p) => p.message).join("; ")}`);
@@ -364,7 +366,7 @@ class Night {
   private updateStatus(): void {
     const measured = this.lab.trials.filter((t) => t.status === "measured");
     const top = ranking(byConfig(this.lab.trials), this.direction)[0];
-    const anchorValue = this.lab.anchor ? trialObjective(this.lab.anchor) : null;
+    const anchorValue = anchorMean(this.lab.trials);
     const gain = top && anchorValue ? ` (${deltaText(top.mean, anchorValue, null, this.direction)} vs production)` : "";
     this.hb.current.message = `${measured.length} measured, ${this.runner.inFlight} running; best ${top ? top.mean.toFixed(1) : "—"}${gain}`;
     const start = this.manifest.time.started_at ? Date.parse(this.manifest.time.started_at) : null;

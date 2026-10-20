@@ -25,6 +25,15 @@ export function trialObjective(trial: Trial): number | null {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
+/** Production's value tonight: the mean over every measurement of the
+ *  anchor's config (the anchor and its repeats), not the first one alone. */
+export function anchorValue(trials: Trial[]): number | null {
+  const anchor = trials.find((t) => t.purpose === "anchor");
+  if (!anchor) return null;
+  const group = byConfig(trials).find((g) => g.key === anchor.key);
+  return group ? group.mean : trialObjective(anchor);
+}
+
 export function trialFeasible(trial: Trial): boolean {
   return trial.measurements.length > 0 && trial.measurements.every((m) => m.feasible);
 }
@@ -69,12 +78,40 @@ function better(a: number, b: number, direction: Direction): boolean {
   return direction === "max" ? a > b : a < b;
 }
 
-/** Feasible configs, best first. Ties go to more measurements, then the earlier trial. */
-export function ranking(stats: ConfigStats[], direction: Direction): ConfigStats[] {
+/** Relative standard deviation of one measurement, pooled over every config
+ *  measured more than once (production first of all: the night measures it
+ *  twice); `prior` until there is a repeat. */
+export function relativeSd(stats: ConfigStats[], prior = 0.01): number {
+  let sum = 0;
+  let dof = 0;
+  for (const g of stats) {
+    if (g.values.length < 2 || g.mean === 0) continue;
+    for (const v of g.values) sum += ((v - g.mean) / g.mean) ** 2;
+    dof += g.values.length - 1;
+  }
+  return dof ? Math.sqrt(sum / dof) : prior;
+}
+
+/** A config's value as it can be trusted: its mean, moved one standard error
+ *  toward worse. One lucky measurement no longer outranks a config measured
+ *  twice at nearly the same mean; measuring a config again can only make its
+ *  score more honest, never pull a good config below a lucky one. */
+export function conservative(g: ConfigStats, sd: number, direction: Direction): number {
+  const se = (sd * Math.abs(g.mean)) / Math.sqrt(g.values.length);
+  return direction === "max" ? g.mean - se : g.mean + se;
+}
+
+/** Feasible configs, best first by their conservative value. Ties go to
+ *  more measurements, then the earlier trial. */
+export function ranking(stats: ConfigStats[], direction: Direction, prior = 0.01): ConfigStats[] {
+  const sd = relativeSd(stats, prior);
+  const score = new Map(stats.map((g) => [g.key, conservative(g, sd, direction)]));
   return stats
     .filter((g) => g.feasible)
     .sort((a, b) => {
-      if (a.mean !== b.mean) return better(a.mean, b.mean, direction) ? -1 : 1;
+      const sa = score.get(a.key)!;
+      const sb = score.get(b.key)!;
+      if (sa !== sb) return better(sa, sb, direction) ? -1 : 1;
       if (a.values.length !== b.values.length) return b.values.length - a.values.length;
       return Math.min(...a.trialIds) - Math.min(...b.trialIds);
     });

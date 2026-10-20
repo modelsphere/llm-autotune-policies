@@ -16,6 +16,7 @@ import {
   ranking,
   trialFeasible,
   trialObjective,
+  anchorValue as anchorMean,
 } from "../lab/stats.js";
 
 export interface RecordContext {
@@ -154,7 +155,7 @@ function contenderLines(top: ConfigStats[], anchorConfig: Trial["config"] | unde
 export function renderRecord(ctx: RecordContext): string {
   const { manifest, lab, direction } = ctx;
   const anchor = lab.anchor;
-  const anchorValue = anchor ? trialObjective(anchor) : null;
+  const anchorValue = anchor ? anchorMean(lab.trials) : null;
   const stats = byConfig(lab.trials);
   const noise = noiseBand(stats);
   const top = ranking(stats, direction).slice(0, manifest.contenders?.max ?? 2);

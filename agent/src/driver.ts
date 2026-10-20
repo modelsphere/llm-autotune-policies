@@ -45,6 +45,19 @@ export function estimateTokens(value: unknown): number {
   return Math.ceil(JSON.stringify(value).length / 4);
 }
 
+/** The conversation without the reasoning of all but the latest assistant
+ *  turn. What a turn concluded is in its text, its tool calls and the lab
+ *  record; its thinking is long, and kept for every turn it fills the window
+ *  within a few turns and forces the conversation to be trimmed. */
+export function withoutOldReasoning(messages: AgentMessage[]): AgentMessage[] {
+  const last = messages.map((m) => m.role).lastIndexOf("assistant");
+  return messages.map((m, i) => {
+    if (m.role !== "assistant" || i === last) return m;
+    const content = (m as AssistantMessage).content.filter((block) => block.type !== "thinking");
+    return { ...(m as AssistantMessage), content } as AgentMessage;
+  });
+}
+
 export class AgentDriver {
   readonly agent: Agent;
   tokens = 0;
@@ -54,6 +67,10 @@ export class AgentDriver {
   private firstErrorAt: number | null = null;
   private retries = 0;
   private warnedFull = false;
+  /** Lab events since the last "conversation nearly full" warning: with
+   *  nothing new there is nothing new to write down, and warning again only
+   *  makes the model answer the warning. */
+  private newsSinceWarning = 0;
   private trimHarder = false;
   private readonly sleep: (ms: number) => Promise<void>;
 
@@ -87,6 +104,7 @@ export class AgentDriver {
    *  one is woken with it. */
   notify(text: string): void {
     if (this.stopped) return;
+    this.newsSinceWarning += 1;
     const message: AgentMessage = { role: "user", content: `[lab event ${new Date().toISOString()}] ${text}`, timestamp: Date.now() };
     if (this.running) this.agent.steer(message);
     else {
@@ -167,10 +185,11 @@ export class AgentDriver {
     const record: AgentMessage = { role: "user", content: this.opts.record(), timestamp: Date.now() };
     const budget = this.opts.contextWindow - this.opts.maxOutputTokens - estimateTokens(record) - 2000;
     const system = messages.filter((m) => m.role === "system");
-    let rolling = messages.filter((m) => m.role !== "system");
+    let rolling = withoutOldReasoning(messages.filter((m) => m.role !== "system"));
     const size = estimateTokens(rolling);
-    if (!this.warnedFull && size > budget * 0.7) {
+    if (!this.warnedFull && this.newsSinceWarning > 0 && size > budget * 0.7) {
       this.warnedFull = true;
+      this.newsSinceWarning = 0;
       this.agent.steer({
         role: "user",
         content:

@@ -19,7 +19,6 @@ export interface RunnerOptions {
   direction: Direction;
   /** Re-bench a result this much better (fraction) than the best so far. */
   anomalyThreshold: number;
-  maxParallel?: number;
   suite: string;
 }
 
@@ -79,8 +78,7 @@ export class TrialRunner {
   freeSlots(cards = 1): number {
     const byPorts = this.freePorts.length;
     const byCards = this.hasCards ? Math.floor(this.freeCards.length / Math.max(1, cards)) : byPorts;
-    const byCap = this.opts.maxParallel ? Math.max(0, this.opts.maxParallel - this.running.size) : Infinity;
-    return Math.max(0, Math.min(byPorts, byCards, byCap));
+    return Math.max(0, Math.min(byPorts, byCards));
   }
 
   fits(cards: number): boolean {
@@ -92,7 +90,6 @@ export class TrialRunner {
   pump(): void {
     if (this.stopped) return;
     for (const trial of this.lab.trials.filter((t) => t.status === "queued")) {
-      if (this.opts.maxParallel && this.running.size >= this.opts.maxParallel) break;
       if (!this.freePorts.length) break;
       const cards = this.hasCards ? trial.cards : 0;
       if (this.hasCards && this.freeCards.length < cards) continue;

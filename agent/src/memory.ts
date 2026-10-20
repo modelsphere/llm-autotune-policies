@@ -5,7 +5,7 @@
 
 import type { Manifest } from "./contract/types.js";
 import type { Constraint, Hypothesis, LabState, Lesson, PriorNight } from "./lab/state.js";
-import { byConfig, type Direction, ranking, trialFeasible, trialObjective } from "./lab/stats.js";
+import { byConfig, type Direction, ranking, trialFeasible, trialObjective, anchorValue as anchorMean } from "./lab/stats.js";
 
 export const STATE_FORMAT = "llm-autotune-agent/1";
 const MAX_NIGHTS = 12;
@@ -48,7 +48,7 @@ export function applyMemory(lab: LabState, memory: Memory): void {
 
 export function tonight(lab: LabState, manifest: Manifest, endedReason: string, direction: Direction): PriorNight {
   const top = ranking(byConfig(lab.trials), direction)[0];
-  const anchor = lab.anchor ? trialObjective(lab.anchor) : null;
+  const anchor = anchorMean(lab.trials);
   const measured = lab.trials.filter((t) => t.status === "measured" || t.status === "failed");
   return {
     sessionId: manifest.session_id,

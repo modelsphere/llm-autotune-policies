@@ -13,8 +13,9 @@ contract **1.3** (diagnostics, `POST /configs/check`, forbidden parameters).
 
 ## How a night goes
 
-1. The production config is measured first, as the **anchor** every result is
-   compared with.
+1. The production config is measured first, twice and side by side, as the
+   **anchor** every result is compared with; the pair is the first estimate of
+   the measurement noise.
 2. The model reads the **lab record**, opens hypotheses, and fills every free
    slot with experiments. Trials run in parallel on disjoint cards.
 3. Each config passes the platform's dry run before it can cost a launch:
@@ -25,8 +26,10 @@ contract **1.3** (diagnostics, `POST /configs/check`, forbidden parameters).
 5. A result suspiciously better than the best so far is benchmarked again on
    the same engine before anyone trusts it. Near the end the finalists are
    re-measured, so the configs the platform validates rest on repeats.
-6. The best feasible configs (by mean measurement, chosen in code) are kept
-   registered as contenders after every trial. At the deadline, or when the
+6. The best feasible configs are kept registered as contenders after every
+   trial, chosen in code by their mean moved one standard error toward worse
+   (the noise pooled over every repeat), so a single lucky measurement does
+   not outrank a config measured twice at nearly the same level. At the deadline, or when the
    model says it is done, the night finalizes and the platform validates them.
 7. Lessons, constraints, settled hypotheses and the night's ledger are saved
    with `PUT /state` for the next night.
@@ -76,6 +79,9 @@ curl -X POST https://<autotune>/api/policies -H "X-API-Key: $KEY" \
 | `LLM_COMPAT` | `{}` | JSON: pi-ai's [OpenAI compatibility flags](https://github.com/earendil-works/pi/tree/main/packages/ai#openai-compatibility-settings) for this endpoint, e.g. `{"thinkingFormat": "qwen-chat-template"}`. The defaults suit self-hosted servers (no `developer` role, no `reasoning_effort`). |
 | `AGENT_POLL_SECONDS` | `10` | How often launches and benchmarks are polled. |
 
+How much runs at once is the campaign's **GPU budget** (`policy_settings.cards`)
+and the policy's ports: each trial takes the cards its config uses.
+
 A campaign can override these per campaign in its policy settings, under
 Advanced → **Policy parameters** (`policy.params` in the manifest):
 
@@ -83,7 +89,6 @@ Advanced → **Policy parameters** (`policy.params` in the manifest):
 | --- | --- | --- |
 | `model`, `base_url`, `thinking`, `reasoning`, `context_window`, `max_output_tokens`, `compat` | from env | As above. |
 | `max_tokens_per_night` | `0` (no limit) | Stop asking the model after this many tokens. |
-| `max_parallel` | `0` (cards and ports decide) | At most this many trials at once. |
 | `anomaly_threshold` | `0.15` | Re-bench a result this much better than the best so far. |
 | `confirm_top_k` | `2` | Finalists re-measured near the end. |
 | `outage_minutes` | `20` | Finalize if the model stays unreachable this long. |

@@ -26,7 +26,6 @@ export interface Settings {
   /** Stop asking the model once this many tokens were spent (0 = no limit). */
   maxTokensPerNight: number;
   /** At most this many trials at once (0 = as many as cards and ports allow). */
-  maxParallel: number;
   /** Re-bench a result this much better than the best so far before trusting it. */
   anomalyThreshold: number;
   /** Re-measure this many of the best configs near the end, so finalists rest on repeats. */
@@ -103,7 +102,6 @@ export function resolveSettings(env: NodeJS.ProcessEnv, params: Record<string, u
     ...platform,
     llm,
     maxTokensPerNight: num(params.max_tokens_per_night ?? env.AGENT_MAX_TOKENS_PER_NIGHT, 0),
-    maxParallel: num(params.max_parallel ?? env.AGENT_MAX_PARALLEL, 0),
     anomalyThreshold: num(params.anomaly_threshold, 0.15),
     confirmTopK: num(params.confirm_top_k, 2),
     outageMinutes: num(params.outage_minutes, 20),
