@@ -79,10 +79,21 @@ function median(values: number[]): number | null {
 function levelLine(t: Trial): string {
   const m = t.measurements.at(-1);
   if (!m || !m.levels.length) return "";
-  const keys = ["output_tps", "ttft_p99_ms", "itl_p99_ms"];
+  // uptime and error_rate are the direct signals that a level served at all;
+  // a latency of 0 or a tiny throughput is only a symptom of what they say.
+  const keys = ["output_tps", "ttft_p99_ms", "itl_p99_ms", "uptime", "error_rate"];
   return m.levels
     .map((l) => `c${l.concurrency}: ${keys.filter((k) => k in l.metrics).map((k) => `${k.replace("_ms", "")} ${fmt(l.metrics[k])}`).join(", ")}`)
     .join(" | ");
+}
+
+/** Levels where requests did not succeed: uptime below 1 or any errors. */
+export function unhealthyLevels(t: Trial): string[] {
+  const m = t.measurements.at(-1);
+  if (!m) return [];
+  return m.levels
+    .filter((l) => (l.metrics.uptime !== undefined && l.metrics.uptime < 1) || (l.metrics.error_rate ?? 0) > 0)
+    .map((l) => `c${l.concurrency}${l.metrics.uptime !== undefined ? ` uptime ${fmt(l.metrics.uptime)}` : ""}${l.metrics.error_rate ? ` errors ${fmt(l.metrics.error_rate)}` : ""}`);
 }
 
 function trialRow(t: Trial, anchorConfig: Trial["config"] | undefined, anchorValue: number | null, noise: number | null, direction: Direction): string {
@@ -98,9 +109,12 @@ function trialRow(t: Trial, anchorConfig: Trial["config"] | undefined, anchorVal
     parts.push(`objective ${fmt(value)}${t.measurements.length > 1 ? ` (mean of ${t.measurements.length}: ${t.measurements.map((m) => fmt(m.objective)).join(", ")})` : ""}`);
     if (delta) parts.push(`vs anchor ${delta}`);
     if (!trialFeasible(t)) parts.push(`INFEASIBLE: ${t.measurements.flatMap((m) => m.breaches).join("; ") || "redline crossed"}`);
+    const unhealthy = unhealthyLevels(t);
+    if (unhealthy.length) parts.push(`REQUESTS FAILED at ${unhealthy.join(", ")}`);
     const levels = levelLine(t);
     if (levels) parts.push(levels);
   }
+  if (t.engineWarnings?.length) parts.push(`engine warnings: ${t.engineWarnings.slice(0, 5).join(" / ")}${t.engineWarnings.length > 5 ? ` (+${t.engineWarnings.length - 5} more, inspect_trial)` : ""}`);
   if (t.failure) {
     const d = t.failure.diagnosis;
     parts.push(

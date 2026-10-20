@@ -32,6 +32,7 @@ export interface RunnerHooks {
 
 const LAUNCH_DONE = new Set(["serving", "failed", "released"]);
 const BENCH_DONE = new Set(["succeeded", "failed", "killed"]);
+const WARNING_PATTERN = "warn";
 const ERROR_PATTERN = "error|exception|traceback|out of memory|oom|unrecognized|invalid|killed|fatal|assert";
 
 export class TrialRunner {
@@ -216,6 +217,7 @@ export class TrialRunner {
       const message = err instanceof PolicyError || err instanceof Error ? err.message : String(err);
       this.fail(trial, "launch", "harness_error", message);
     } finally {
+      if (launch && launch.id && trial.servingAt) await this.collectWarnings(trial, launch.id);
       if (launch && launch.id) {
         try {
           await this.client.release(launch.id);
@@ -283,6 +285,26 @@ export class TrialRunner {
       // older platform, or not recorded yet
     }
     if (launch.endpoint_url) trial.serverInfo = await serverInfo(launch.endpoint_url);
+  }
+
+  /** The engine's own warnings while it served, deduplicated: a disabled
+   *  CUDA graph, a fallback kernel or a capped batch shows up here, not in the
+   *  numbers. Best effort. */
+  private async collectWarnings(trial: Trial, launchId: number): Promise<void> {
+    try {
+      const lines = (await this.client.launchLog(launchId, { grep: WARNING_PATTERN, tail: 400 })).split("\n");
+      const seen = new Map<string, string>();
+      for (const line of lines) {
+        const text = line.trim();
+        if (!text || text === "--") continue;
+        // The same warning repeats with timestamps, counters and addresses.
+        const key = text.replace(/^[\d\-:T. ,\[\]]+/, "").replace(/\d+(\.\d+)?/g, "N").slice(0, 160);
+        if (!seen.has(key)) seen.set(key, text.slice(0, 300));
+      }
+      if (seen.size) trial.engineWarnings = [...seen.values()].slice(0, 30);
+    } catch {
+      // the log is gone or the platform is older
+    }
   }
 
   private async logExcerpt(launchId: number): Promise<string> {

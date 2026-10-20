@@ -83,6 +83,8 @@ export interface Trial {
   /** The engine's own account of its resolved arguments, when it offers one. */
   serverInfo?: Record<string, unknown>;
   environment?: Record<string, unknown>;
+  /** Distinct warning lines the engine logged while serving this trial. */
+  engineWarnings?: string[];
   /** Harness notes: "anomaly: re-benched before trusting", … */
   notes: string[];
 }
