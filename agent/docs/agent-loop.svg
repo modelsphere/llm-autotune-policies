@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="620" viewBox="0 0 1040 620" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="640" viewBox="0 0 1240 640" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#4a5568"/>
     </marker>
   </defs>
-  <rect width="1040" height="620" fill="#ffffff"/>
+  <rect width="1240" height="640" fill="#ffffff"/>
 
   <!-- the agent policy -->
   <rect x="20" y="20" width="680" height="540" rx="16" fill="#f7f9fc" stroke="#cbd5e0" stroke-width="1.5"/>
@@ -74,24 +74,38 @@
   <text x="210" y="337" font-size="11.5" fill="#6b46c1" font-style="italic">before old turns go</text>
 
   <!-- platform -->
-  <rect x="760" y="70" width="260" height="460" rx="16" fill="#f7fafc" stroke="#718096" stroke-width="1.5"/>
-  <text x="890" y="100" font-size="16" font-weight="600" fill="#2d3748" text-anchor="middle">AutoTune platform</text>
-  <text x="890" y="140" font-size="12.5" fill="#2d3748" text-anchor="middle">at the end, measures the finalists</text>
-  <text x="890" y="157" font-size="12.5" fill="#2d3748" text-anchor="middle">and production side by side:</text>
-  <text x="890" y="180" font-size="13" font-weight="600" fill="#2d3748" text-anchor="middle">that is the verdict</text>
-  <line x1="780" y1="300" x2="1000" y2="300" stroke="#e2e8f0" stroke-width="1.5"/>
-  <text x="890" y="446" font-size="12.5" fill="#2d3748" text-anchor="middle">launches each engine and</text>
-  <text x="890" y="463" font-size="12.5" fill="#2d3748" text-anchor="middle">measures it with the benchmark</text>
-  <line x1="780" y1="490" x2="1000" y2="490" stroke="#e2e8f0" stroke-width="1.5"/>
-  <text x="890" y="514" font-size="12.5" fill="#2d3748" text-anchor="middle">keeps the books between nights</text>
+  <rect x="930" y="70" width="290" height="460" rx="16" fill="#f7fafc" stroke="#718096" stroke-width="1.5"/>
+  <text x="1075" y="100" font-size="16" font-weight="600" fill="#2d3748" text-anchor="middle">AutoTune platform</text>
 
-  <!-- platform arrows -->
-  <line x1="672" y1="185" x2="756" y2="185" stroke="#4a5568" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
-  <text x="714" y="175" font-size="12" fill="#4a5568" text-anchor="middle">finalists</text>
-  <line x1="674" y1="455" x2="756" y2="455" stroke="#4a5568" stroke-width="2" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
-  <text x="715" y="445" font-size="12" fill="#4a5568" text-anchor="middle">launch</text>
-  <text x="715" y="475" font-size="12" fill="#4a5568" text-anchor="middle">measure</text>
+  <text x="946" y="138" font-size="12.5" font-weight="600" fill="#2d3748">Holds the agent's best list</text>
+  <text x="946" y="155" font-size="11.5" fill="#4a5568">replaced after every result</text>
+  <text x="946" y="198" font-size="12.5" font-weight="600" fill="#2d3748">At the deadline: the verdict</text>
+  <text x="946" y="215" font-size="11.5" fill="#4a5568">stops the agent, then launches the best</text>
+  <text x="946" y="230" font-size="11.5" fill="#4a5568">list and production itself, side by side,</text>
+  <text x="946" y="245" font-size="11.5" fill="#4a5568">on the same benchmark — its numbers,</text>
+  <text x="946" y="260" font-size="11.5" fill="#4a5568">not the agent's, decide the winner</text>
+  <line x1="946" y1="300" x2="1204" y2="300" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="946" y="420" font-size="12.5" font-weight="600" fill="#2d3748">Runs every experiment</text>
+  <text x="946" y="437" font-size="11.5" fill="#4a5568">starts the engine on the given cards,</text>
+  <text x="946" y="452" font-size="11.5" fill="#4a5568">replays real traffic at it, reports</text>
+  <text x="946" y="467" font-size="11.5" fill="#4a5568">the numbers and the engine's log</text>
+  <line x1="946" y1="488" x2="1204" y2="488" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="946" y="512" font-size="12.5" font-weight="600" fill="#2d3748">Keeps notes between nights</text>
+
+  <!-- exchanges: best list and the deadline -->
+  <line x1="672" y1="140" x2="926" y2="140" stroke="#4a5568" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="800" y="131" font-size="12" fill="#2d3748" text-anchor="middle" font-style="italic">"my best configs so far"</text>
+  <line x1="926" y1="215" x2="672" y2="215" stroke="#c53030" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+  <text x="800" y="206" font-size="12" fill="#c53030" text-anchor="middle" font-style="italic">"time's up — stop"</text>
+
+  <!-- exchanges: experiments -->
+  <line x1="672" y1="430" x2="926" y2="430" stroke="#4a5568" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="800" y="421" font-size="12" fill="#2d3748" text-anchor="middle" font-style="italic">"run this config on cards 4–5"</text>
+  <line x1="926" y1="480" x2="672" y2="480" stroke="#4a5568" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="800" y="471" font-size="12" fill="#2d3748" text-anchor="middle" font-style="italic">"numbers + engine log"</text>
+
   <!-- memory across nights -->
-  <path d="M195,532 L195,588 L890,588 L890,534" fill="none" stroke="#dd8a2b" stroke-width="2" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
-  <text x="540" y="606" font-size="12" fill="#7b341e" text-anchor="middle">lessons, constraints and settled questions saved at the end; the next night starts from them</text>
+  <path d="M195,532 L195,592 L1075,592 L1075,532" fill="none" stroke="#dd8a2b" stroke-width="2" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="635" y="584" font-size="12" fill="#7b341e" text-anchor="middle" font-style="italic">end of night: "save my lessons and constraints"</text>
+  <text x="635" y="612" font-size="12" fill="#7b341e" text-anchor="middle" font-style="italic">next night: "here is what earlier nights learned"</text>
 </svg>

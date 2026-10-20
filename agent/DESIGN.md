@@ -25,18 +25,23 @@ final word.
 
 - **Memory lives in the books, not in the conversation.** A long
   conversation forgets or drifts; a record rebuilt from the books every turn
-  cannot. When the conversation fills up, old turns are dropped (their long
-  reasoning first), but the model is first asked to write down anything it
-  learned, so what matters survives as a note in the books. The record itself
-  is never dropped.
+  cannot. The conversation is limited by tokens, not rounds: the model's
+  context window less room for its reply and the record. Old reasoning is
+  dropped every turn; when the conversation passes 85% of that budget the
+  oldest turns go, down to 60% — but at 70% the model is first asked to write
+  down anything it learned, so what matters survives as a note in the books.
+  The record itself is never dropped.
 - **The model only gets experiment verbs.** Propose, check, read a log,
   measure again, write a note — no shell, no files. It spends its effort on
   tuning, not on operating a computer.
 - **Code decides what is a finalist.** The model cannot write scores. Results
   are compared against production measured twice, and noise is taken into
   account, so one lucky measurement cannot win.
-- **The platform gives the verdict.** At the end it measures the finalists and
-  production itself, side by side. A good story from the model does not count.
+- **The platform runs the experiments and gives the verdict.** The agent
+  only asks ("run this config on these cards") and reads back numbers and
+  logs. It keeps its current best list registered with the platform; at the
+  deadline the platform stops it and measures that list and production
+  itself, side by side. A good story from the model does not count.
 - **Failures teach.** A failed launch is read and diagnosed, and becomes a
   constraint the model sees on every later turn, so the same mistake is not
   paid for twice.
