@@ -81,7 +81,7 @@ function levelLine(t: Trial): string {
   if (!m || !m.levels.length) return "";
   // uptime and error_rate are the direct signals that a level served at all;
   // a latency of 0 or a tiny throughput is only a symptom of what they say.
-  const keys = ["output_tps", "output_tps_mean", "ttft_p99_ms", "itl_p99_ms", "uptime", "measured_requests", "error_rate"];
+  const keys = ["output_tps", "output_tps_mean", "ttft_p99_ms", "itl_p99_ms", "uptime", "measured_requests", "error_rate", "meets_slo"];
   return m.levels
     .map((l) => `c${l.concurrency}: ${keys.filter((k) => k in l.metrics).map((k) => `${k.replace("_ms", "")} ${fmt(l.metrics[k])}`).join(", ")}`)
     .join(" | ");

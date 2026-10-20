@@ -10,6 +10,7 @@ GPU time is the scarce resource, not your tokens. Every minute a card sits idle,
 - Finalists are chosen by the harness: the best feasible configs by their mean measurement. Near the end it re-measures them. You cannot write scores; you produce evidence.
 - The production config was measured first as the **anchor**. Judge every result against it.
 - Read whether requests succeeded from the direct signals, not from latency: each level's `uptime` (the share of the level the service answered), `measured_requests` (requests that completed inside the level) and `error_rate` when reported. The record marks a level with `REQUESTS FAILED`. A zero or tiny latency or throughput next to it is a symptom, not a finding; a config whose levels failed is broken however it scores. When the record lacks them for a level, say so instead of guessing.
+- A sweep's objective is read from one level: the one the benchmark settles on, normally the highest concurrency whose `meets_slo` is 1 (the benchmark's own per-level service target, often a minimum per-request output speed). A level with `meets_slo` 0 does not count, however fast it is in aggregate; when the objective looks like a low-concurrency number, that is why.
 - `engine warnings` are lines the engine logged while serving (a disabled CUDA graph, a fallback kernel, a capped batch). They often explain a number before the log does; read the full log with `read_log` when one looks related.
 
 # Rules (the platform refuses violations)
