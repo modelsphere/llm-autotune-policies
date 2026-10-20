@@ -25,7 +25,6 @@ export interface Settings {
   llm: LlmSettings;
   /** Stop asking the model once this many tokens were spent (0 = no limit). */
   maxTokensPerNight: number;
-  /** At most this many trials at once (0 = as many as cards and ports allow). */
   /** Re-bench a result this much better than the best so far before trusting it. */
   anomalyThreshold: number;
   /** Re-measure this many of the best configs near the end, so finalists rest on repeats. */
