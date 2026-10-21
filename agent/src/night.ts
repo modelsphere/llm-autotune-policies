@@ -16,7 +16,7 @@ import { Heartbeat } from "./contract/heartbeat.js";
 import type { Config, ContenderIn, Manifest, PlanExtra } from "./contract/types.js";
 import { budget, type RecordContext, renderRecord } from "./context/render.js";
 import { AgentDriver } from "./driver.js";
-import { buildModel, diagnose } from "./llm.js";
+import { buildModel, diagnose, writeDigest } from "./llm.js";
 import { applyMemory, loadMemory, snapshot } from "./memory.js";
 import { LabState, type Trial } from "./lab/state.js";
 import { diffText, sweptKeys } from "./lab/space.js";
@@ -117,11 +117,13 @@ class Night {
 
   private model!: ReturnType<typeof buildModel>;
   private diagnosePrompt = "";
+  private digestPrompt = "";
 
   async run(): Promise<number> {
     const { client, manifest, hb, settings, lab, log } = this;
     this.model = this.opts.model ?? buildModel(settings.llm);
     this.diagnosePrompt = await prompt("diagnose.md");
+    this.digestPrompt = await prompt("digest.md");
     const system = (await prompt("system.md"))
       .replaceAll("{{engine}}", manifest.model.engine)
       .replaceAll("{{metric}}", this.targetMetric)
@@ -375,6 +377,25 @@ class Night {
     }
   }
 
+  /** The night's findings for other campaigns, when the platform takes them.
+   *  Best effort: a night without a digest is only a night others cannot
+   *  learn from. */
+  private async fileDigest(): Promise<void> {
+    if (!this.manifest.services?.history || !this.lab.trials.some((t) => t.status === "measured")) return;
+    this.hb.current.message = "writing the night's digest";
+    try {
+      const digest = await writeDigest(this.model.models, this.model.model, this.digestPrompt, renderRecord(this.recordContext()));
+      if (!digest) {
+        this.log("digest: the model gave nothing usable; none filed");
+        return;
+      }
+      await this.client.putDigest(digest);
+      this.log(`digest filed: ${digest.lessons.length} lesson(s), ${digest.constraints.length} constraint(s), ${digest.open_questions.length} open question(s)`);
+    } catch (err) {
+      this.log(`digest not filed: ${(err as Error).message}`);
+    }
+  }
+
   private async saveState(reason: string): Promise<void> {
     try {
       await this.client.putState(snapshot(this.lab, this.manifest, reason, this.direction));
@@ -427,6 +448,9 @@ class Night {
     } catch (err) {
       if (!(err instanceof PolicyError)) throw err;
     }
+    // After finalized: the platform validates the finalists meanwhile, so the
+    // model call costs no GPU time.
+    await this.fileDigest();
     hb.current.phase = "validating";
     hb.current.message = "finalized; the platform is measuring the finalists";
     log(`finalized after ${this.lab.trials.length} trial(s); model tokens used: ${this.driver.tokens}`);

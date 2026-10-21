@@ -61,6 +61,7 @@ export class FakePlatform {
   readonly launches = new Map<number, { config: Config; status: string; polls: number; released: boolean; gpus: number[]; port: number }>();
   readonly benches = new Map<number, { launch: number; polls: number; status: string }>();
   contenders: Record<string, unknown>[] = [];
+  digest: Record<string, unknown> | undefined;
   state: unknown;
   finalized = false;
   command = "run";
@@ -126,7 +127,7 @@ export class FakePlatform {
     const now = Date.now();
     const cards = this.opts.cards ?? 4;
     return {
-      contract: { version: "1.3" },
+      contract: { version: "1.4" },
       session_id: this.opts.sessionId ?? 7,
       campaign_id: 3,
       policy: { name: "agent", image: "agent:test", version: "0.1.0", params: this.opts.params ?? {} },
@@ -161,6 +162,7 @@ export class FakePlatform {
         },
         state: true,
         diagnostics: true,
+        history: true,
       },
       prior: { contenders: [] },
       measures: CATALOGUE,
@@ -279,6 +281,10 @@ export class FakePlatform {
           id: 1000 + id, seq: i + 1, config: {}, config_hash: "", source: "platform", run_id: id,
           reported_metrics: {}, reported_objective_value: null, reported_feasible: null, failure_class: "", duration_seconds: null, notes: "",
         })));
+      }
+      if (req.method === "PUT" && path === "/session/digest") {
+        this.digest = body;
+        return send(204, "");
       }
       if (req.method === "PUT" && path === "/contenders") {
         this.contenders = body.contenders;

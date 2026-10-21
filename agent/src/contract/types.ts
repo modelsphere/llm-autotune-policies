@@ -23,4 +23,4 @@ export type TrialOut = Schemas["TrialOut"];
 /** A flat dict of engine args in the platform's canonical spelling. */
 export type Config = Record<string, unknown>;
 
-export const CONTRACT_VERSION = "1.3";
+export const CONTRACT_VERSION = "1.4";

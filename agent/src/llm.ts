@@ -98,3 +98,50 @@ export async function diagnose(
     return fallback;
   }
 }
+
+/** What a night learned, for other campaigns (PUT /session/digest). */
+export interface Digest {
+  summary: string;
+  lessons: { text: string; scope: string }[];
+  constraints: string[];
+  open_questions: string[];
+}
+
+const SCOPES = new Set(["campaign", "model", "engine", "hardware"]);
+
+/** The night's digest, written by the model from the full lab record. Null
+ *  when the model cannot be asked or answers with nothing usable: the
+ *  platform then simply has no digest for this night. */
+export async function writeDigest(
+  models: Models,
+  model: Model<"openai-completions">,
+  prompt: string,
+  record: string,
+): Promise<Digest | null> {
+  const response = await models.completeSimple(
+    model,
+    { systemPrompt: prompt, messages: [{ role: "user", content: record, timestamp: Date.now() }] },
+    { reasoning: "medium", maxTokens: 8000 },
+  );
+  if (response.stopReason === "error" || response.stopReason === "aborted") return null;
+  const text = response.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("");
+  const match = /\{[\s\S]*\}/.exec(text);
+  if (!match) return null;
+  try {
+    const raw = JSON.parse(match[0]) as Partial<Digest>;
+    if (!raw.summary || typeof raw.summary !== "string") return null;
+    const strings = (v: unknown, max: number, len: number) =>
+      (Array.isArray(v) ? v : []).filter((x): x is string => typeof x === "string" && x.trim() !== "").slice(0, max).map((x) => x.slice(0, len));
+    return {
+      summary: raw.summary.slice(0, 20000),
+      lessons: (Array.isArray(raw.lessons) ? raw.lessons : [])
+        .filter((l) => l && typeof l.text === "string" && l.text.trim() !== "")
+        .slice(0, 50)
+        .map((l) => ({ text: l.text.slice(0, 2000), scope: SCOPES.has(String(l.scope)) ? String(l.scope) : "campaign" })),
+      constraints: strings(raw.constraints, 50, 2000),
+      open_questions: strings(raw.open_questions, 20, 2000),
+    };
+  } catch {
+    return null;
+  }
+}

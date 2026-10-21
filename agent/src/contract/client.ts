@@ -205,6 +205,10 @@ export class PolicyClient {
   listTrials(): Promise<TrialOut[]> {
     return this.request("GET", "/trials");
   }
+  /** What tonight learned, for other campaigns (1.4). */
+  putDigest(digest: unknown): Promise<void> {
+    return this.request("PUT", "/session/digest", digest);
+  }
   getContenders(): Promise<ContenderOut[]> {
     return this.request("GET", "/contenders");
   }
