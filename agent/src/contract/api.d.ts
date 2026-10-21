@@ -1030,6 +1030,8 @@ export interface components {
             links?: {
                 [key: string]: string;
             };
+            /** Measures */
+            measures?: components["schemas"]["ScenarioMeasures"][];
             /** Metrics */
             metrics?: {
                 [key: string]: unknown;

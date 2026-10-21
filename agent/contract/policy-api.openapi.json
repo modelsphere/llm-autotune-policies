@@ -1484,6 +1484,13 @@
             "title": "Links",
             "type": "object"
           },
+          "measures": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioMeasures"
+            },
+            "title": "Measures",
+            "type": "array"
+          },
           "metrics": {
             "additionalProperties": true,
             "title": "Metrics",
