@@ -1,0 +1,3257 @@
+{
+  "components": {
+    "schemas": {
+      "BenchmarkOut": {
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "deviations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Deviations",
+            "type": "array"
+          },
+          "error": {
+            "default": "",
+            "title": "Error",
+            "type": "string"
+          },
+          "failure_class": {
+            "default": "",
+            "title": "Failure Class",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "measures": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioMeasures"
+            },
+            "title": "Measures",
+            "type": "array"
+          },
+          "metrics": {
+            "additionalProperties": true,
+            "title": "Metrics",
+            "type": "object"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "suite": {
+            "default": "screen",
+            "title": "Suite",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BenchmarkSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "BenchmarkOut",
+        "type": "object"
+      },
+      "BenchmarkSuite": {
+        "properties": {
+          "approx_minutes": {
+            "title": "Approx Minutes",
+            "type": "integer"
+          },
+          "dataset_build_id": {
+            "default": "",
+            "title": "Dataset Build Id",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "workload": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Workload",
+            "type": "array"
+          }
+        },
+        "required": [
+          "slug",
+          "approx_minutes"
+        ],
+        "title": "BenchmarkSuite",
+        "type": "object"
+      },
+      "BenchmarkSummary": {
+        "properties": {
+          "breaches": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Breaches",
+            "type": "array"
+          },
+          "constraints": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Constraints",
+            "type": "array"
+          },
+          "feasible": {
+            "default": false,
+            "title": "Feasible",
+            "type": "boolean"
+          },
+          "objective_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objective Value"
+          }
+        },
+        "title": "BenchmarkSummary",
+        "type": "object"
+      },
+      "ConfigCheckIn": {
+        "properties": {
+          "engine_args": {
+            "additionalProperties": true,
+            "title": "Engine Args",
+            "type": "object"
+          }
+        },
+        "required": [
+          "engine_args"
+        ],
+        "title": "ConfigCheckIn",
+        "type": "object"
+      },
+      "ConfigCheckOut": {
+        "description": "What a launch of this config would meet, without spending one.\n\n`ok` is false when a launch, benchmark or contender with this config would\nbe refused (`problems`). `warnings` never refuse anything: flags the\nplatform's catalog does not know (the engine may still accept them) and\nhow the config steps outside the declared space (`deviations`).",
+        "properties": {
+          "cards": {
+            "default": 0,
+            "title": "Cards",
+            "type": "integer"
+          },
+          "command": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Command",
+            "type": "array"
+          },
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "deviations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Deviations",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigProblem"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "ConfigCheckOut",
+        "type": "object"
+      },
+      "ConfigProblem": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "param": {
+            "default": "",
+            "title": "Param",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "message"
+        ],
+        "title": "ConfigProblem",
+        "type": "object"
+      },
+      "ContenderIn": {
+        "properties": {
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "launch_spec": {
+            "$ref": "#/components/schemas/ContenderLaunchSpec"
+          },
+          "rank": {
+            "minimum": 1.0,
+            "title": "Rank",
+            "type": "integer"
+          },
+          "trial_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Trial Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rank",
+          "launch_spec"
+        ],
+        "title": "ContenderIn",
+        "type": "object"
+      },
+      "ContenderLaunchSpec": {
+        "properties": {
+          "engine_args": {
+            "additionalProperties": true,
+            "title": "Engine Args",
+            "type": "object"
+          },
+          "env": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Env",
+            "type": "object"
+          },
+          "environment": {
+            "additionalProperties": true,
+            "title": "Environment",
+            "type": "object"
+          },
+          "image": {
+            "minLength": 1,
+            "title": "Image",
+            "type": "string"
+          },
+          "volumes": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Volumes",
+            "type": "object"
+          }
+        },
+        "required": [
+          "engine_args",
+          "image"
+        ],
+        "title": "ContenderLaunchSpec",
+        "type": "object"
+      },
+      "ContenderOut": {
+        "properties": {
+          "config_hash": {
+            "title": "Config Hash",
+            "type": "string"
+          },
+          "deviations": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deviations"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "launch_spec": {
+            "additionalProperties": true,
+            "title": "Launch Spec",
+            "type": "object"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "skip_reason": {
+            "default": "",
+            "title": "Skip Reason",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "trial_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Trial Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "rank",
+          "launch_spec",
+          "config_hash",
+          "status",
+          "evidence",
+          "trial_ids"
+        ],
+        "title": "ContenderOut",
+        "type": "object"
+      },
+      "ContendersEcho": {
+        "description": "The PUT response: what was accepted, and what was refused and why \u2014\nrejected entries are echoed rather than 422ing the whole list, so one bad\nspec cannot cost a policy its good ones.",
+        "properties": {
+          "accepted": {
+            "items": {
+              "$ref": "#/components/schemas/ContenderOut"
+            },
+            "title": "Accepted",
+            "type": "array"
+          },
+          "rejected": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Rejected",
+            "type": "array"
+          }
+        },
+        "required": [
+          "accepted"
+        ],
+        "title": "ContendersEcho",
+        "type": "object"
+      },
+      "ContendersPut": {
+        "properties": {
+          "contenders": {
+            "items": {
+              "$ref": "#/components/schemas/ContenderIn"
+            },
+            "title": "Contenders",
+            "type": "array"
+          }
+        },
+        "required": [
+          "contenders"
+        ],
+        "title": "ContendersPut",
+        "type": "object"
+      },
+      "DimCoverage": {
+        "description": "What a policy has explored along one declared axis.\n\nKeyed by the platform's own parameter name (`space.swept_keys()`), so the\ntwo sides speak one coordinate system. Discrete points go in `tried_values`;\na continuous/model-based sweep reports the interval(s) it has covered in\n`tried_ranges` ([{\"min\": .., \"max\": ..}]). `skipped_values` is intent \u2014 a\nregion the policy deliberately will not try (e.g. tp=1 OOMs) \u2014 so coverage\nshows it as \"skipped\", not \"unexplored\".",
+        "properties": {
+          "param": {
+            "title": "Param",
+            "type": "string"
+          },
+          "skipped_values": {
+            "items": {},
+            "title": "Skipped Values",
+            "type": "array"
+          },
+          "tried_ranges": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Tried Ranges",
+            "type": "array"
+          },
+          "tried_values": {
+            "items": {},
+            "title": "Tried Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "param"
+        ],
+        "title": "DimCoverage",
+        "type": "object"
+      },
+      "EnvironmentPart": {
+        "properties": {
+          "card_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Type"
+          },
+          "cuda_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuda Version"
+          },
+          "duration_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Seconds"
+          },
+          "engine_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Version"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "gpu_indices": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Gpu Indices",
+            "type": "array"
+          },
+          "gpu_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Name"
+          },
+          "image_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Digest"
+          },
+          "kind": {
+            "const": "environment",
+            "default": "environment",
+            "title": "Kind",
+            "type": "string"
+          },
+          "machine": {
+            "$ref": "#/components/schemas/app__schemas__agent__MachineOut"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "integer"
+          },
+          "schema_version": {
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "snapshot": {
+            "additionalProperties": true,
+            "title": "Snapshot",
+            "type": "object"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "torch_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Torch Version"
+          }
+        },
+        "required": [
+          "run_id",
+          "machine"
+        ],
+        "title": "EnvironmentPart",
+        "type": "object"
+      },
+      "ExternalBenchmarkIn": {
+        "properties": {
+          "engine_args": {
+            "additionalProperties": true,
+            "title": "Engine Args",
+            "type": "object"
+          },
+          "gpu_indices": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Gpu Indices",
+            "type": "array"
+          },
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "suite": {
+            "default": "screen",
+            "title": "Suite",
+            "type": "string"
+          }
+        },
+        "required": [
+          "port",
+          "engine_args"
+        ],
+        "title": "ExternalBenchmarkIn",
+        "type": "object"
+      },
+      "FailureOut": {
+        "properties": {
+          "error": {
+            "default": "",
+            "title": "Error",
+            "type": "string"
+          },
+          "failure_class": {
+            "default": "",
+            "title": "Failure Class",
+            "type": "string"
+          },
+          "log": {
+            "default": "",
+            "title": "Log",
+            "type": "string"
+          },
+          "run_status": {
+            "default": "",
+            "title": "Run Status",
+            "type": "string"
+          }
+        },
+        "title": "FailureOut",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HeartbeatIn": {
+        "properties": {
+          "capabilities": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capabilities"
+          },
+          "contract_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract Version"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PolicyCoverage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure_class": {
+            "default": "",
+            "title": "Failure Class",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "phase": {
+            "default": "",
+            "title": "Phase",
+            "type": "string"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "sdk_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sdk Version"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "HeartbeatIn",
+        "type": "object"
+      },
+      "HeartbeatOut": {
+        "properties": {
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "contender_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contender Id"
+          },
+          "hard_deadline": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hard Deadline"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "search_deadline": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Deadline"
+          }
+        },
+        "required": [
+          "command",
+          "search_deadline",
+          "hard_deadline"
+        ],
+        "title": "HeartbeatOut",
+        "type": "object"
+      },
+      "LaunchBenchmarkIn": {
+        "properties": {
+          "suite": {
+            "default": "screen",
+            "title": "Suite",
+            "type": "string"
+          }
+        },
+        "title": "LaunchBenchmarkIn",
+        "type": "object"
+      },
+      "LaunchIn": {
+        "properties": {
+          "engine_args": {
+            "additionalProperties": true,
+            "title": "Engine Args",
+            "type": "object"
+          },
+          "gpu_indices": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Gpu Indices",
+            "type": "array"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          }
+        },
+        "required": [
+          "engine_args"
+        ],
+        "title": "LaunchIn",
+        "type": "object"
+      },
+      "LaunchOut": {
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "deviations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Deviations",
+            "type": "array"
+          },
+          "endpoint_url": {
+            "default": "",
+            "title": "Endpoint Url",
+            "type": "string"
+          },
+          "error": {
+            "default": "",
+            "title": "Error",
+            "type": "string"
+          },
+          "failure_class": {
+            "default": "",
+            "title": "Failure Class",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "launch_command": {
+            "default": "",
+            "title": "Launch Command",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "waiting_reason": {
+            "default": "",
+            "title": "Waiting Reason",
+            "type": "string"
+          },
+          "waiting_since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waiting Since"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "LaunchOut",
+        "type": "object"
+      },
+      "ManifestContenders": {
+        "properties": {
+          "approx_minutes_each": {
+            "title": "Approx Minutes Each",
+            "type": "integer"
+          },
+          "max": {
+            "title": "Max",
+            "type": "integer"
+          },
+          "validation_suite": {
+            "default": "verify",
+            "title": "Validation Suite",
+            "type": "string"
+          }
+        },
+        "required": [
+          "max",
+          "approx_minutes_each"
+        ],
+        "title": "ManifestContenders",
+        "type": "object"
+      },
+      "ManifestHardware": {
+        "properties": {
+          "gpu_indices": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Gpu Indices",
+            "type": "array"
+          },
+          "gpu_type": {
+            "default": "",
+            "title": "Gpu Type",
+            "type": "string"
+          },
+          "gpus_visible_in_container": {
+            "default": true,
+            "title": "Gpus Visible In Container",
+            "type": "boolean"
+          },
+          "machine": {
+            "title": "Machine",
+            "type": "string"
+          },
+          "node_count": {
+            "default": 0,
+            "title": "Node Count",
+            "type": "integer"
+          },
+          "node_gpu_max": {
+            "default": 0,
+            "title": "Node Gpu Max",
+            "type": "integer"
+          },
+          "pool": {
+            "default": false,
+            "title": "Pool",
+            "type": "boolean"
+          },
+          "ports": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ports",
+            "type": "array"
+          }
+        },
+        "required": [
+          "machine"
+        ],
+        "title": "ManifestHardware",
+        "type": "object"
+      },
+      "ManifestModel": {
+        "properties": {
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
+          "extra_env": {
+            "additionalProperties": true,
+            "title": "Extra Env",
+            "type": "object"
+          },
+          "extra_volumes": {
+            "additionalProperties": true,
+            "title": "Extra Volumes",
+            "type": "object"
+          },
+          "image": {
+            "title": "Image",
+            "type": "string"
+          },
+          "model_path": {
+            "title": "Model Path",
+            "type": "string"
+          },
+          "served_model_name": {
+            "title": "Served Model Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "engine",
+          "image",
+          "model_path",
+          "served_model_name"
+        ],
+        "title": "ManifestModel",
+        "type": "object"
+      },
+      "ManifestObjective": {
+        "properties": {
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "redlines": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Redlines",
+            "type": "array"
+          },
+          "target_metric": {
+            "title": "Target Metric",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_metric",
+          "direction"
+        ],
+        "title": "ManifestObjective",
+        "type": "object"
+      },
+      "ManifestServices": {
+        "properties": {
+          "benchmarks": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/BenchmarkSuite"
+            },
+            "title": "Benchmarks",
+            "type": "object"
+          },
+          "diagnostics": {
+            "default": false,
+            "title": "Diagnostics",
+            "type": "boolean"
+          },
+          "launch": {
+            "default": true,
+            "title": "Launch",
+            "type": "boolean"
+          },
+          "state": {
+            "default": true,
+            "title": "State",
+            "type": "boolean"
+          }
+        },
+        "title": "ManifestServices",
+        "type": "object"
+      },
+      "ManifestTime": {
+        "properties": {
+          "hard_deadline": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hard Deadline"
+          },
+          "heartbeat_interval_s": {
+            "title": "Heartbeat Interval S",
+            "type": "integer"
+          },
+          "heartbeat_timeout_s": {
+            "title": "Heartbeat Timeout S",
+            "type": "integer"
+          },
+          "search_deadline": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Deadline"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "tick_s": {
+            "title": "Tick S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "started_at",
+          "search_deadline",
+          "hard_deadline",
+          "heartbeat_interval_s",
+          "heartbeat_timeout_s",
+          "tick_s"
+        ],
+        "title": "ManifestTime",
+        "type": "object"
+      },
+      "ModuleStatusOut": {
+        "properties": {
+          "error": {
+            "default": "",
+            "title": "Error",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "module_name": {
+            "default": "",
+            "title": "Module Name",
+            "type": "string"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "ModuleStatusOut",
+        "type": "object"
+      },
+      "PlanExtra": {
+        "properties": {
+          "param": {
+            "title": "Param",
+            "type": "string"
+          },
+          "range": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Range"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "values": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Values"
+          }
+        },
+        "required": [
+          "param"
+        ],
+        "title": "PlanExtra",
+        "type": "object"
+      },
+      "PlanIn": {
+        "properties": {
+          "extras": {
+            "items": {
+              "$ref": "#/components/schemas/PlanExtra"
+            },
+            "title": "Extras",
+            "type": "array"
+          },
+          "notes": {
+            "default": "",
+            "title": "Notes",
+            "type": "string"
+          },
+          "tuning": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tuning",
+            "type": "array"
+          }
+        },
+        "title": "PlanIn",
+        "type": "object"
+      },
+      "PolicyCoverage": {
+        "description": "The policy's own account of how far it has searched \u2014 the *supplement*\nthe platform cannot derive from the trial ledger: a completion estimate for\nan infinite/model-based space, deliberate skips, and self-served work the\nplatform never saw as a trial. Advisory: the platform trusts its own\nledger for what was actually measured and badges this as self-reported.",
+        "properties": {
+          "dimensions": {
+            "items": {
+              "$ref": "#/components/schemas/DimCoverage"
+            },
+            "title": "Dimensions",
+            "type": "array"
+          },
+          "fraction": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fraction"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "title": "PolicyCoverage",
+        "type": "object"
+      },
+      "PolicyEventIn": {
+        "properties": {
+          "level": {
+            "default": "info",
+            "title": "Level",
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "PolicyEventIn",
+        "type": "object"
+      },
+      "QualityOut": {
+        "properties": {
+          "error": {
+            "default": "",
+            "title": "Error",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "module_name": {
+            "default": "",
+            "title": "Module Name",
+            "type": "string"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed"
+          },
+          "scores": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Scores",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "QualityOut",
+        "type": "object"
+      },
+      "ResultsHeadline": {
+        "properties": {
+          "meets_gate": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meets Gate"
+          },
+          "output_tpm_card_norm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tpm Card Norm"
+          },
+          "peak_concurrency": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Concurrency"
+          },
+          "quality": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Quality",
+            "type": "object"
+          },
+          "ranking_metric": {
+            "default": "",
+            "title": "Ranking Metric",
+            "type": "string"
+          },
+          "ranking_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranking Value"
+          },
+          "reported_concurrency": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Concurrency"
+          },
+          "total_tpm_card_norm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tpm Card Norm"
+          }
+        },
+        "title": "ResultsHeadline",
+        "type": "object"
+      },
+      "ResultsPart": {
+        "properties": {
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FailureOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "feasible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feasible"
+          },
+          "headline": {
+            "$ref": "#/components/schemas/ResultsHeadline"
+          },
+          "kind": {
+            "const": "results",
+            "default": "results",
+            "title": "Kind",
+            "type": "string"
+          },
+          "links": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Links",
+            "type": "object"
+          },
+          "measures": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioMeasures"
+            },
+            "title": "Measures",
+            "type": "array"
+          },
+          "metrics": {
+            "additionalProperties": true,
+            "title": "Metrics",
+            "type": "object"
+          },
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/ModuleStatusOut"
+            },
+            "title": "Modules",
+            "type": "array"
+          },
+          "objective_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objective Value"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed"
+          },
+          "quality": {
+            "items": {
+              "$ref": "#/components/schemas/QualityOut"
+            },
+            "title": "Quality",
+            "type": "array"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "integer"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioOut"
+            },
+            "title": "Scenarios",
+            "type": "array"
+          },
+          "schema_version": {
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "status": {
+            "enum": [
+              "measured",
+              "failed",
+              "running",
+              "queued"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "verdicts": {
+            "items": {
+              "$ref": "#/components/schemas/VerdictOut"
+            },
+            "title": "Verdicts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "run_id",
+          "status"
+        ],
+        "title": "ResultsPart",
+        "type": "object"
+      },
+      "ScenarioLevel": {
+        "properties": {
+          "concurrency": {
+            "title": "Concurrency",
+            "type": "integer"
+          },
+          "metrics": {
+            "additionalProperties": true,
+            "title": "Metrics",
+            "type": "object"
+          }
+        },
+        "required": [
+          "concurrency"
+        ],
+        "title": "ScenarioLevel",
+        "type": "object"
+      },
+      "ScenarioMeasures": {
+        "description": "One module's results as measures (docs/api/measures.md).",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "module": {
+            "title": "Module",
+            "type": "string"
+          },
+          "operating": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Operating",
+            "type": "object"
+          },
+          "operating_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operating Level"
+          },
+          "operating_rule": {
+            "default": "",
+            "title": "Operating Rule",
+            "type": "string"
+          },
+          "points": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "title": "Points",
+            "type": "object"
+          },
+          "scenario": {
+            "title": "Scenario",
+            "type": "string"
+          },
+          "supports": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Supports",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scenario",
+          "module",
+          "kind"
+        ],
+        "title": "ScenarioMeasures",
+        "type": "object"
+      },
+      "ScenarioOut": {
+        "properties": {
+          "best_level": {
+            "additionalProperties": true,
+            "title": "Best Level",
+            "type": "object"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "default": "sweep",
+            "enum": [
+              "sweep",
+              "replay"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "levels": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioLevel"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "metrics": {
+            "additionalProperties": true,
+            "title": "Metrics",
+            "type": "object"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "summary": {
+            "additionalProperties": true,
+            "title": "Summary",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "ScenarioOut",
+        "type": "object"
+      },
+      "ServingIn": {
+        "properties": {
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "port"
+        ],
+        "title": "ServingIn",
+        "type": "object"
+      },
+      "SessionManifest": {
+        "properties": {
+          "campaign_id": {
+            "title": "Campaign Id",
+            "type": "integer"
+          },
+          "contenders": {
+            "$ref": "#/components/schemas/ManifestContenders"
+          },
+          "contract": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Contract",
+            "type": "object"
+          },
+          "hardware": {
+            "$ref": "#/components/schemas/ManifestHardware"
+          },
+          "measures": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Measures",
+            "type": "array"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ManifestModel"
+          },
+          "objective": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ManifestObjective"
+            },
+            "title": "Objective",
+            "type": "object"
+          },
+          "policy": {
+            "additionalProperties": true,
+            "title": "Policy",
+            "type": "object"
+          },
+          "prior": {
+            "additionalProperties": true,
+            "title": "Prior",
+            "type": "object"
+          },
+          "production": {
+            "additionalProperties": true,
+            "title": "Production",
+            "type": "object"
+          },
+          "search_space": {
+            "additionalProperties": true,
+            "title": "Search Space",
+            "type": "object"
+          },
+          "services": {
+            "$ref": "#/components/schemas/ManifestServices"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "integer"
+          },
+          "space_policy": {
+            "additionalProperties": true,
+            "title": "Space Policy",
+            "type": "object"
+          },
+          "time": {
+            "$ref": "#/components/schemas/ManifestTime"
+          }
+        },
+        "required": [
+          "session_id",
+          "campaign_id",
+          "policy",
+          "model",
+          "hardware",
+          "objective",
+          "search_space",
+          "time",
+          "contenders",
+          "services"
+        ],
+        "title": "SessionManifest",
+        "type": "object"
+      },
+      "TrialIn": {
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "duration_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Seconds"
+          },
+          "failure_class": {
+            "default": "",
+            "title": "Failure Class",
+            "type": "string"
+          },
+          "notes": {
+            "default": "",
+            "title": "Notes",
+            "type": "string"
+          },
+          "reported_feasible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Feasible"
+          },
+          "reported_metrics": {
+            "additionalProperties": true,
+            "title": "Reported Metrics",
+            "type": "object"
+          },
+          "reported_objective_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Objective Value"
+          },
+          "source": {
+            "default": "self",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "config"
+        ],
+        "title": "TrialIn",
+        "type": "object"
+      },
+      "TrialOut": {
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "config_hash": {
+            "title": "Config Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "duration_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Seconds"
+          },
+          "failure_class": {
+            "title": "Failure Class",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string"
+          },
+          "reported_feasible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Feasible"
+          },
+          "reported_metrics": {
+            "additionalProperties": true,
+            "title": "Reported Metrics",
+            "type": "object"
+          },
+          "reported_objective_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Objective Value"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "config",
+          "config_hash",
+          "source",
+          "run_id",
+          "reported_metrics",
+          "reported_objective_value",
+          "reported_feasible",
+          "failure_class",
+          "duration_seconds",
+          "notes"
+        ],
+        "title": "TrialOut",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "VerdictOut": {
+        "properties": {
+          "actual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "metric": {
+            "title": "Metric",
+            "type": "string"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "module": {
+            "title": "Module",
+            "type": "string"
+          },
+          "ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ok"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "module",
+          "metric",
+          "role"
+        ],
+        "title": "VerdictOut",
+        "type": "object"
+      },
+      "app__schemas__agent__MachineOut": {
+        "properties": {
+          "driver": {
+            "default": "",
+            "title": "Driver",
+            "type": "string"
+          },
+          "gpu_count": {
+            "default": 0,
+            "title": "Gpu Count",
+            "type": "integer"
+          },
+          "gpu_type": {
+            "default": "",
+            "title": "Gpu Type",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "title": "MachineOut",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "\nAutomated parameter search for LLM inference engines (sglang, vLLM).\n\nA **campaign** searches a **search space** against an **objective**, on machines\nthe platform has been **leased**. Each point becomes a **run**: a container is\nlaunched with those engine arguments, benchmarked by LLMBench, and scored.\n\n### Authentication\n\nTwo credentials, both accepted on the lease endpoints:\n\n* **`Authorization: Bearer <jwt>`** \u2014 for people. `POST /api/auth/login`.\n* **`X-API-Key: atk_\u2026`** \u2014 for services. Minted at `POST /api/api-keys`, shown\n  once. Everything else takes the bearer token only.\n\n### Integrating a fleet manager\n\nThe **machine leases** section is the surface built for external callers. The\nshort version:\n\n```\nPOST /api/machines/lease           {\"name\": \"node-24\", \"host\": \"\u2026\", \"due_at\": \u2026}\nGET  /api/machines/node-24/lease     -> readiness: busy | idle | returnable\nPOST /api/machines/node-24/lease/end {\"mode\": \"polite\"}\n```\n\nEnding a lease is asynchronous. The machine is yours when `readiness` reads\n`returnable` \u2014 by which point the production service we found on it has been\nput back and verified.\n",
+    "title": "LLM AutoTune",
+    "version": "0.3.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/policy/v1/benchmarks": {
+      "post": {
+        "operationId": "bench_external_api_policy_v1_benchmarks_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalBenchmarkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Bench External",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/benchmarks/{run_id}": {
+      "delete": {
+        "operationId": "cancel_benchmark_api_policy_v1_benchmarks__run_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Cancel Benchmark",
+        "tags": [
+          "policy sessions"
+        ]
+      },
+      "get": {
+        "operationId": "benchmark_status_api_policy_v1_benchmarks__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Benchmark Status",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/benchmarks/{run_id}/results": {
+      "get": {
+        "description": "The benchmark in full: every scenario, every concurrency level, latency\npercentiles, the best level that met the gate. `status` says whether it is\nmeasured yet.",
+        "operationId": "benchmark_results_api_policy_v1_benchmarks__run_id__results_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultsPart"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Benchmark Results",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/benchmarks/{run_id}/results/raw": {
+      "get": {
+        "description": "The benchmark platform's own result payload, exactly as harvested.",
+        "operationId": "benchmark_results_raw_api_policy_v1_benchmarks__run_id__results_raw_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Benchmark Results Raw",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/configs/check": {
+      "post": {
+        "description": "Everything a launch of this config would meet \u2014 refusals, the canonical\necho, the rendered command, catalog warnings, deviations \u2014 without\nspending a launch. Never 422s: the answer is the point.",
+        "operationId": "check_config_api_policy_v1_configs_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Check Config",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/contenders": {
+      "get": {
+        "operationId": "list_contenders_api_policy_v1_contenders_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ContenderOut"
+                  },
+                  "title": "Response List Contenders Api Policy V1 Contenders Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "List Contenders",
+        "tags": [
+          "policy sessions"
+        ]
+      },
+      "put": {
+        "operationId": "put_contenders_api_policy_v1_contenders_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContendersPut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContendersEcho"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Put Contenders",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/contenders/{contender_id}/serving": {
+      "post": {
+        "operationId": "contender_serving_api_policy_v1_contenders__contender_id__serving_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contender_id",
+            "required": true,
+            "schema": {
+              "title": "Contender Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServingIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContenderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Contender Serving",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/events": {
+      "post": {
+        "operationId": "post_event_api_policy_v1_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyEventIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Post Event",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/launches": {
+      "post": {
+        "operationId": "request_launch_api_policy_v1_launches_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LaunchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LaunchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Request Launch",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/launches/{run_id}": {
+      "delete": {
+        "operationId": "release_launch_api_policy_v1_launches__run_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LaunchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Release Launch",
+        "tags": [
+          "policy sessions"
+        ]
+      },
+      "get": {
+        "operationId": "launch_status_api_policy_v1_launches__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LaunchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Launch Status",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/launches/{run_id}/benchmarks": {
+      "post": {
+        "operationId": "bench_launch_api_policy_v1_launches__run_id__benchmarks_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LaunchBenchmarkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Bench Launch",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/launches/{run_id}/environment": {
+      "get": {
+        "description": "What the launch actually ran on: engine, torch and CUDA versions, image\ndigest, card. Recorded once the engine is up; fill a contender's\n`launch_spec.environment` from it to make its verdict promotable.",
+        "operationId": "launch_environment_api_policy_v1_launches__run_id__environment_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentPart"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Launch Environment",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/launches/{run_id}/log": {
+      "get": {
+        "description": "The engine's log: live from its container while it runs, the saved copy\nafter. Startup errors, OOM traces and the engine's own throughput lines\nare here \u2014 the evidence a failed or slow launch leaves.",
+        "operationId": "launch_log_api_policy_v1_launches__run_id__log_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tail",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 20000,
+              "minimum": 1,
+              "title": "Tail",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "grep",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Grep"
+            }
+          },
+          {
+            "in": "query",
+            "name": "context",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 50,
+              "minimum": 0,
+              "title": "Context",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Launch Log",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/session": {
+      "get": {
+        "operationId": "manifest_api_policy_v1_session_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionManifest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Manifest",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/session/finalized": {
+      "post": {
+        "operationId": "finalized_api_policy_v1_session_finalized_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Finalized",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/session/heartbeat": {
+      "post": {
+        "operationId": "heartbeat_api_policy_v1_session_heartbeat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeartbeatIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeartbeatOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Heartbeat",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/session/plan": {
+      "put": {
+        "operationId": "put_plan_api_policy_v1_session_plan_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Put Plan",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/state": {
+      "get": {
+        "operationId": "get_state_api_policy_v1_state_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Get State",
+        "tags": [
+          "policy sessions"
+        ]
+      },
+      "put": {
+        "operationId": "put_state_api_policy_v1_state_put",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Put State",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/trials": {
+      "get": {
+        "operationId": "list_trials_api_policy_v1_trials_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TrialOut"
+                  },
+                  "title": "Response List Trials Api Policy V1 Trials Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "List Trials",
+        "tags": [
+          "policy sessions"
+        ]
+      },
+      "post": {
+        "operationId": "report_trial_api_policy_v1_trials_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrialIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Report Trial",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    }
+  }
+}

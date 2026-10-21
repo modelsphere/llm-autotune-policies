@@ -168,6 +168,9 @@ class DryRunPlatform:
     def get_launch(self, launch_id):
         return self.launches[launch_id]
 
+    def launch_environment(self, launch_id):
+        return self.launches[launch_id].get("environment", {})
+
     def release(self, launch_id):
         self.launches[launch_id]["status"] = "released"
 

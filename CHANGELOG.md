@@ -7,11 +7,30 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `agent`: an LLM agent policy. A language model proposes complete engine
+  configurations — any flag the campaign does not forbid — from a lab record
+  rebuilt before every request (every trial with per-concurrency numbers,
+  diagnosed failures, constraints, lessons, earlier nights). The harness owns
+  the clock, parallel trials on disjoint cards, the production anchor, an
+  anomaly re-bench, finalist confirmation, contenders and cross-night memory.
+  TypeScript on the pi agent runtime (MIT); any OpenAI-compatible endpoint;
+  needs platform contract 1.3. CI runs offline nights against a fake platform
+  with a scripted model and gates third-party licenses. It reads results only
+  in the platform's measures, so the record, `compare` and the failed-request
+  check work on a replay and a sweep alike, and each contender names the
+  platform trials it rests on.
 - `heuristic-search`: constraint-aware local search with strategy checkpoints,
   an offline simulator, and local JSON Lines decision logs. Its image is built
   in CI; automatic GHCR publishing remains limited to `random-search`.
 
 ### Changed
+- The SDK reads a serving launch's environment (`GET /launches/{id}/environment`,
+  contract 1.3) and hands it to the strategy in `TrialResult.raw["environment"]`.
+  Contenders registered by random-search and heuristic-search were always sent
+  with an empty environment, because the benchmark response the strategies read
+  it from never carries one; their verdicts are promotable now. On an older
+  platform the environment stays empty, as before.
+- `scripts/sync-sdk.sh` copies the SDK into Python policies only.
 - Launch and benchmark idempotency keys are scoped to a search-loop run to avoid
   collisions after a process restart. In-flight launches remain memory-only and
   are not resumed or reconciled by a restarted loop.

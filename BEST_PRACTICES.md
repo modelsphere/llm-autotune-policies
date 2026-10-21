@@ -96,3 +96,25 @@ image on a version tag.
 Because the fake night exercises the entire contract, a green check means a
 change to `strategies/` didn't break the protocol — that's the safety net that
 lets you iterate on the algorithm without re-reading this document each time.
+
+## An LLM as the strategy
+
+[`agent/`](agent/) is a worked example of a policy whose decisions come from a
+language model. What it shows, whatever language or runtime you use:
+
+- **Keep the contract out of the model.** The heartbeat runs on its own timer,
+  and the harness — not the model — registers contenders, picks them by mean
+  measurement, and saves state. A model that stalls or errs cannot wedge the
+  session or lose what was found.
+- **Rebuild the context from your own books.** Send the complete, current
+  ledger (every trial, every diagnosed failure, constraints, lessons) as the
+  newest message on every request, and trim only the conversation around it.
+- **Check before you launch.** `POST /configs/check` answers what a launch
+  would refuse (forbidden parameters, the command-line round trip, safety) for
+  free; feed refusals back to the model instead of spending a launch on them.
+- **Measure twice before believing.** Re-bench a suspiciously large gain and
+  re-measure the finalists; show the model noise bands, not bare deltas.
+- **Read the evidence the platform keeps.** Launch logs, the engine's
+  environment and per-concurrency results are on the menu under
+  `services.diagnostics` (contract 1.3).
+
