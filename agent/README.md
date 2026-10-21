@@ -36,6 +36,10 @@ words.
    model says it is done, the night finalizes and the platform validates them.
 7. Lessons, constraints, settled hypotheses and the night's ledger are saved
    with `PUT /state` for the next night.
+8. Once the search is over, while the platform validates, the model writes a
+   digest of what the night established (scoped lessons, what failed and why,
+   open questions) and files it with `PUT /session/digest` (contract 1.4), for
+   other campaigns to read through `GET /history`.
 
 ## What pi does, and what this adds
 
@@ -53,7 +57,7 @@ lab rather than a chat:
 | Tools | `src/tools.ts` | The model's only verbs: `propose`, `check`, `inspect_trial`, `read_log`, `compare`, `remeasure`, `cancel_trial`, `open_hypothesis`, `close_hypothesis`, `add_constraint`, `record_lesson`, `done`. No shell, no files. |
 | Runner | `src/runner.ts` | Places trials on cards and ports, runs launch → benchmark → results → release, captures the engine's environment and resolved arguments, diagnoses failures. |
 | Night | `src/night.ts` | The lifecycle: plan (with the parameters the model introduced, declared as extras), anchor, nudges when cards sit idle, confirmation, contenders (with the platform's own trial ids as evidence), state, finalize. |
-| Prompts | `prompts/` | The system prompt (the search protocol) and the diagnostician. The main tuning surface. |
+| Prompts | `prompts/` | The system prompt (the search protocol), the diagnostician, and the digest writer. The main tuning surface. |
 
 ## Configuration
 

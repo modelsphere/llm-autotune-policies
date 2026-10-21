@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `agent`: files a digest of each night for other campaigns (platform
+  contract 1.4). Once the search is over, while the platform validates, the
+  model writes what the night established: the effects that held, what failed
+  and why, scoped lessons, open questions.
 - `agent`: an LLM agent policy. A language model proposes complete engine
   configurations — any flag the campaign does not forbid — from a lab record
   rebuilt before every request (every trial with per-concurrency numbers,

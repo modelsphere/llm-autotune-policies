@@ -155,6 +155,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/policy/v1/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * History
+         * @description Other campaigns' nights, newest first: what each policy wrote it
+         *     learned, under which conditions, and what the platform validated. Only
+         *     campaigns of the same owner; this campaign's own nights are in /state.
+         *     Findings from another workload or image are hints, not facts here.
+         */
+        get: operations["history_api_policy_v1_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/policy/v1/launches": {
         parameters: {
             query?: never;
@@ -261,6 +284,27 @@ export interface paths {
         /** Manifest */
         get: operations["manifest_api_policy_v1_session_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/policy/v1/session/digest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Digest
+         * @description What tonight learned, for other campaigns. Replaces any earlier digest
+         *     of this session; accepted until the session ends.
+         */
+        put: operations["put_digest_api_policy_v1_session_digest_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -562,6 +606,32 @@ export interface components {
             contenders: components["schemas"]["ContenderIn"][];
         };
         /**
+         * DigestIn
+         * @description What a night learned, in the policy's words: written once its search is
+         *     over, for other campaigns to read through GET /history. The conditions it
+         *     was learned under are the platform's to state, not the policy's.
+         */
+        DigestIn: {
+            /** Constraints */
+            constraints?: string[];
+            /** Lessons */
+            lessons?: components["schemas"]["DigestLesson"][];
+            /** Open Questions */
+            open_questions?: string[];
+            /** Summary */
+            summary: string;
+        };
+        /** DigestLesson */
+        DigestLesson: {
+            /**
+             * Scope
+             * @default campaign
+             */
+            scope: string;
+            /** Text */
+            text: string;
+        };
+        /**
          * DimCoverage
          * @description What a policy has explored along one declared axis.
          *
@@ -714,6 +784,79 @@ export interface components {
             /** Search Deadline */
             search_deadline: string | null;
         };
+        /**
+         * HistoryConditions
+         * @description Under what a night's findings hold, from the platform's own records.
+         */
+        HistoryConditions: {
+            /**
+             * Benchmark Slug
+             * @default
+             */
+            benchmark_slug: string;
+            /** Cards */
+            cards?: number | null;
+            /** Engine */
+            engine: string;
+            /** Forbidden */
+            forbidden?: string[];
+            /**
+             * Gpu Type
+             * @default
+             */
+            gpu_type: string;
+            /** Image */
+            image: string;
+            /** Model Path */
+            model_path: string;
+            objective: components["schemas"]["ManifestObjective"];
+            /** Served Model Name */
+            served_model_name: string;
+        };
+        /** HistoryEntry */
+        HistoryEntry: {
+            /** Campaign Id */
+            campaign_id: number;
+            /** Campaign Name */
+            campaign_name: string;
+            conditions: components["schemas"]["HistoryConditions"];
+            digest?: components["schemas"]["DigestIn"] | null;
+            /**
+             * End Reason
+             * @default
+             */
+            end_reason: string;
+            /** Ended At */
+            ended_at?: string | null;
+            /** Session Id */
+            session_id: number;
+            /** Verdicts */
+            verdicts?: components["schemas"]["HistoryVerdict"][];
+        };
+        /**
+         * HistoryVerdict
+         * @description One config the platform validated at the end of the night.
+         */
+        HistoryVerdict: {
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /**
+             * Holds Redlines
+             * @default true
+             */
+            holds_redlines: boolean;
+            /**
+             * Is Production
+             * @default false
+             */
+            is_production: boolean;
+            /** Value */
+            value?: number | null;
+            /** Vs Production */
+            vs_production?: number | null;
+        };
         /** LaunchBenchmarkIn */
         LaunchBenchmarkIn: {
             /**
@@ -862,6 +1005,11 @@ export interface components {
              * @default false
              */
             diagnostics: boolean;
+            /**
+             * History
+             * @default false
+             */
+            history: boolean;
             /**
              * Launch
              * @default true
@@ -1624,6 +1772,39 @@ export interface operations {
             };
         };
     };
+    history_api_policy_v1_history_get: {
+        parameters: {
+            query?: {
+                /** @description model: same engine and model; engine: same engine */
+                match?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     request_launch_api_policy_v1_launches_post: {
         parameters: {
             query?: never;
@@ -1840,6 +2021,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionManifest"];
+                };
+            };
+        };
+    };
+    put_digest_api_policy_v1_session_digest_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DigestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -13,6 +13,7 @@ import {
   fauxToolCall,
   type TranscriptContext,
 } from "@earendil-works/pi-ai";
+import { CONTRACT_VERSION } from "../src/contract/types.js";
 import { runNight } from "../src/night.js";
 import { FakePlatform, score } from "./fake-platform.js";
 
@@ -35,6 +36,9 @@ function scriptedModel(opts: { stallMs?: number } = {}) {
   const respond = async (context: TranscriptContext): Promise<AssistantMessage> => {
     const messages = context.messages;
     const system = textOf(messages[0]);
+    if (system.startsWith("You write the digest")) {
+      return fauxAssistantMessage(fauxText('{"summary": "chunked_prefill_size 8192 with mem_fraction_static 0.9 beat production.", "lessons": [{"text": "0.95 OOMs at load", "scope": "model"}, {"text": "vague", "scope": "galaxy"}], "constraints": ["mem_fraction_static 0.95 OOMs"], "open_questions": ["does 16384 help too?"]}'));
+    }
     if (system.startsWith("You diagnose")) {
       return fauxAssistantMessage(fauxText('{"cause": "out of memory while capturing CUDA graphs", "offending_flag": "mem_fraction_static", "fix_hint": "lower it below 0.93"}'));
     }
@@ -106,7 +110,7 @@ test("a whole night: anchor, hypotheses, refusals, a diagnosed failure, confirma
 
     // The handshake, then a status signal: the search ended by itself, not by the deadline.
     assert.deepEqual(platform.heartbeats[0].capabilities, []);
-    assert.equal(platform.heartbeats[0].contract_version, "1.3");
+    assert.equal(platform.heartbeats[0].contract_version, CONTRACT_VERSION);
     assert.ok(platform.heartbeats.some((b) => b.status === "exhausted"));
 
     // The forbidden config was refused before it cost a launch; the OOM was diagnosed.
@@ -136,6 +140,13 @@ test("a whole night: anchor, hypotheses, refusals, a diagnosed failure, confirma
     // The plan declared the parameter the agent introduced outside the space.
     const lastPlan = platform.plans.at(-1) as { extras: { param: string }[] };
     assert.ok(lastPlan.extras.some((e) => e.param === "chunked_prefill_size"));
+
+    // What tonight learned is filed for other campaigns, scopes kept honest.
+    const digest = platform.digest as { summary: string; lessons: { scope: string }[]; open_questions: string[] };
+    assert.ok(digest, "a digest was filed");
+    assert.match(digest.summary, /8192/);
+    assert.deepEqual(digest.lessons.map((l) => l.scope), ["model", "campaign"]);
+    assert.deepEqual(digest.open_questions, ["does 16384 help too?"]);
 
     // What tonight learned is saved for the next night.
     const state = platform.state as { format: string; lessons: { text: string }[]; constraints: { text: string }[]; nights: { best: { objective: number } }[] };

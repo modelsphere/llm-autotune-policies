@@ -422,6 +422,65 @@
         "title": "ContendersPut",
         "type": "object"
       },
+      "DigestIn": {
+        "description": "What a night learned, in the policy's words: written once its search is\nover, for other campaigns to read through GET /history. The conditions it\nwas learned under are the platform's to state, not the policy's.",
+        "properties": {
+          "constraints": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Constraints",
+            "type": "array"
+          },
+          "lessons": {
+            "items": {
+              "$ref": "#/components/schemas/DigestLesson"
+            },
+            "maxItems": 50,
+            "title": "Lessons",
+            "type": "array"
+          },
+          "open_questions": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Open Questions",
+            "type": "array"
+          },
+          "summary": {
+            "maxLength": 20000,
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary"
+        ],
+        "title": "DigestIn",
+        "type": "object"
+      },
+      "DigestLesson": {
+        "properties": {
+          "scope": {
+            "default": "campaign",
+            "maxLength": 32,
+            "title": "Scope",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 2000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "DigestLesson",
+        "type": "object"
+      },
       "DimCoverage": {
         "description": "What a policy has explored along one declared axis.\n\nKeyed by the platform's own parameter name (`space.swept_keys()`), so the\ntwo sides speak one coordinate system. Discrete points go in `tried_values`;\na continuous/model-based sweep reports the interval(s) it has covered in\n`tried_ranges` ([{\"min\": .., \"max\": ..}]). `skipped_values` is intent \u2014 a\nregion the policy deliberately will not try (e.g. tp=1 OOMs) \u2014 so coverage\nshows it as \"skipped\", not \"unexplored\".",
         "properties": {
@@ -811,6 +870,175 @@
         "title": "HeartbeatOut",
         "type": "object"
       },
+      "HistoryConditions": {
+        "description": "Under what a night's findings hold, from the platform's own records.",
+        "properties": {
+          "benchmark_slug": {
+            "default": "",
+            "title": "Benchmark Slug",
+            "type": "string"
+          },
+          "cards": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cards"
+          },
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
+          "forbidden": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Forbidden",
+            "type": "array"
+          },
+          "gpu_type": {
+            "default": "",
+            "title": "Gpu Type",
+            "type": "string"
+          },
+          "image": {
+            "title": "Image",
+            "type": "string"
+          },
+          "model_path": {
+            "title": "Model Path",
+            "type": "string"
+          },
+          "objective": {
+            "$ref": "#/components/schemas/ManifestObjective"
+          },
+          "served_model_name": {
+            "title": "Served Model Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "engine",
+          "image",
+          "model_path",
+          "served_model_name",
+          "objective"
+        ],
+        "title": "HistoryConditions",
+        "type": "object"
+      },
+      "HistoryEntry": {
+        "properties": {
+          "campaign_id": {
+            "title": "Campaign Id",
+            "type": "integer"
+          },
+          "campaign_name": {
+            "title": "Campaign Name",
+            "type": "string"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/HistoryConditions"
+          },
+          "digest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DigestIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "end_reason": {
+            "default": "",
+            "title": "End Reason",
+            "type": "string"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "integer"
+          },
+          "verdicts": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryVerdict"
+            },
+            "title": "Verdicts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "campaign_id",
+          "campaign_name",
+          "session_id",
+          "conditions"
+        ],
+        "title": "HistoryEntry",
+        "type": "object"
+      },
+      "HistoryVerdict": {
+        "description": "One config the platform validated at the end of the night.",
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "holds_redlines": {
+            "default": true,
+            "title": "Holds Redlines",
+            "type": "boolean"
+          },
+          "is_production": {
+            "default": false,
+            "title": "Is Production",
+            "type": "boolean"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "vs_production": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vs Production"
+          }
+        },
+        "required": [
+          "config"
+        ],
+        "title": "HistoryVerdict",
+        "type": "object"
+      },
       "LaunchBenchmarkIn": {
         "properties": {
           "suite": {
@@ -1073,6 +1301,11 @@
           "diagnostics": {
             "default": false,
             "title": "Diagnostics",
+            "type": "boolean"
+          },
+          "history": {
+            "default": false,
+            "title": "History",
             "type": "boolean"
           },
           "launch": {
@@ -2624,6 +2857,73 @@
         ]
       }
     },
+    "/api/policy/v1/history": {
+      "get": {
+        "description": "Other campaigns' nights, newest first: what each policy wrote it\nlearned, under which conditions, and what the platform validated. Only\ncampaigns of the same owner; this campaign's own nights are in /state.\nFindings from another workload or image are hints, not facts here.",
+        "operationId": "history_api_policy_v1_history_get",
+        "parameters": [
+          {
+            "description": "model: same engine and model; engine: same engine",
+            "in": "query",
+            "name": "match",
+            "required": false,
+            "schema": {
+              "default": "model",
+              "description": "model: same engine and model; engine: same engine",
+              "title": "Match",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryEntry"
+                  },
+                  "title": "Response History Api Policy V1 History Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "History",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
     "/api/policy/v1/launches": {
       "post": {
         "operationId": "request_launch_api_policy_v1_launches_post",
@@ -3011,6 +3311,46 @@
           }
         ],
         "summary": "Manifest",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/session/digest": {
+      "put": {
+        "description": "What tonight learned, for other campaigns. Replaces any earlier digest\nof this session; accepted until the session ends.",
+        "operationId": "put_digest_api_policy_v1_session_digest_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DigestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Put Digest",
         "tags": [
           "policy sessions"
         ]
