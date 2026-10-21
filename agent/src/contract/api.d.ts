@@ -381,6 +381,8 @@ export interface components {
             failure_class: string;
             /** Id */
             id: number;
+            /** Measures */
+            measures?: components["schemas"]["ScenarioMeasures"][];
             /** Metrics */
             metrics?: {
                 [key: string]: unknown;
@@ -405,6 +407,10 @@ export interface components {
             dataset_build_id: string;
             /** Slug */
             slug: string;
+            /** Workload */
+            workload?: {
+                [key: string]: unknown;
+            }[];
         };
         /** BenchmarkSummary */
         BenchmarkSummary: {
@@ -1064,6 +1070,37 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * ScenarioMeasures
+         * @description One module's results as measures (docs/api/measures.md).
+         */
+        ScenarioMeasures: {
+            /** Kind */
+            kind: string;
+            /** Module */
+            module: string;
+            /** Operating */
+            operating?: {
+                [key: string]: number;
+            };
+            /** Operating Level */
+            operating_level?: string | null;
+            /**
+             * Operating Rule
+             * @default
+             */
+            operating_rule: string;
+            /** Points */
+            points?: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            /** Scenario */
+            scenario: string;
+            /** Supports */
+            supports?: string[];
+        };
         /** ScenarioOut */
         ScenarioOut: {
             /** Best Level */
@@ -1113,6 +1150,10 @@ export interface components {
                 [key: string]: string;
             };
             hardware: components["schemas"]["ManifestHardware"];
+            /** Measures */
+            measures?: {
+                [key: string]: unknown;
+            }[];
             model: components["schemas"]["ManifestModel"];
             /** Objective */
             objective: {

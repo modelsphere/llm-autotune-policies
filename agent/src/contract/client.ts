@@ -19,6 +19,7 @@ import type {
   Manifest,
   PlanExtra,
   ResultsPart,
+  TrialOut,
 } from "./types.js";
 
 export class PolicyError extends Error {
@@ -198,6 +199,11 @@ export class PolicyClient {
   }
   putContenders(contenders: ContenderIn[]): Promise<ContendersEcho> {
     return this.request("PUT", "/contenders", { contenders });
+  }
+  /** The trials the platform recorded this session: one per benchmark it
+   *  measured (`run_id` is the benchmark's id), plus any the policy reported. */
+  listTrials(): Promise<TrialOut[]> {
+    return this.request("GET", "/trials");
   }
   getContenders(): Promise<ContenderOut[]> {
     return this.request("GET", "/contenders");

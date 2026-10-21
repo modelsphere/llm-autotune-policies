@@ -15,7 +15,10 @@ All notable changes to this project are documented here. The format follows
   anomaly re-bench, finalist confirmation, contenders and cross-night memory.
   TypeScript on the pi agent runtime (MIT); any OpenAI-compatible endpoint;
   needs platform contract 1.3. CI runs offline nights against a fake platform
-  with a scripted model and gates third-party licenses.
+  with a scripted model and gates third-party licenses. It reads results only
+  in the platform's measures, so the record, `compare` and the failed-request
+  check work on a replay and a sweep alike, and each contender names the
+  platform trials it rests on.
 - `heuristic-search`: constraint-aware local search with strategy checkpoints,
   an offline simulator, and local JSON Lines decision logs. Its image is built
   in CI; automatic GHCR publishing remains limited to `random-search`.

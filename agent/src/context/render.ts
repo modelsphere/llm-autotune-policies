@@ -8,6 +8,16 @@ import type { Manifest } from "../contract/types.js";
 import type { Hypothesis, LabState, Trial } from "../lab/state.js";
 import { configText, diffText } from "../lab/space.js";
 import {
+  type Catalogue,
+  catalogueOf,
+  fmt,
+  glossary,
+  headlineKeys,
+  LEVEL_KEYS,
+  unhealthyPoints,
+  valuesText,
+} from "../lab/measures.js";
+import {
   byConfig,
   type ConfigStats,
   deltaText,
@@ -32,14 +42,6 @@ export interface RecordContext {
   nowMs?: number;
   tokensUsed?: number;
   tokenLimit?: number;
-}
-
-function fmt(value: number | null | undefined, digits = 1): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return "—";
-  const abs = Math.abs(value);
-  if (abs >= 1e5) return value.toExponential(3);
-  if (abs >= 100) return value.toFixed(0);
-  return value.toFixed(digits);
 }
 
 function minutesBetween(a?: string, b?: string): number | null {
@@ -77,30 +79,30 @@ function median(values: number[]): number | null {
   return v.length ? v[Math.floor(v.length / 2)] : null;
 }
 
-function levelLine(t: Trial): string {
-  const m = t.measurements.at(-1);
-  if (!m || !m.levels.length) return "";
-  // uptime and error_rate are the direct signals that a level served at all;
-  // a latency of 0 or a tiny throughput is only a symptom of what they say.
-  const keys = ["output_tps", "output_tps_mean", "ttft_p99_ms", "itl_p99_ms", "uptime", "measured_requests", "error_rate", "meets_slo"];
-  return m.levels
-    .map((l) => `c${l.concurrency}: ${keys.filter((k) => k in l.metrics).map((k) => `${k.replace("_ms", "")} ${fmt(l.metrics[k])}`).join(", ")}`)
-    .join(" | ");
-}
-
-/** Levels where requests did not succeed: uptime below 1 or any errors. */
-export function unhealthyLevels(t: Trial): string[] {
+/** The latest measurement's numbers, module by module: the operating point's
+ *  headline measures, then each other level of a sweep. */
+function resultLines(t: Trial, catalogue: Catalogue): string[] {
   const m = t.measurements.at(-1);
   if (!m) return [];
-  return m.levels
-    .filter((l) =>
-      (l.metrics.uptime !== undefined && l.metrics.uptime < 1) ||
-      (l.metrics.error_rate ?? 0) > 0 ||
-      l.metrics.measured_requests === 0)
-    .map((l) => `c${l.concurrency}${l.metrics.uptime !== undefined ? ` uptime ${fmt(l.metrics.uptime)}` : ""}${l.metrics.measured_requests === 0 ? " 0 requests completed" : ""}${l.metrics.error_rate ? ` errors ${fmt(l.metrics.error_rate)}` : ""}`);
+  const out: string[] = [];
+  for (const s of m.scenarios) {
+    const at = s.operatingLevel ? ` at ${s.operatingLevel}` : "";
+    out.push(`${s.scenario}${at}: ${valuesText(s.operating, headlineKeys(s.operating, catalogue))}`);
+    const levels = Object.entries(s.points)
+      .filter(([name]) => /^c\d+$/.test(name))
+      .sort(([a], [b]) => Number(a.slice(1)) - Number(b.slice(1)));
+    if (levels.length) out.push(`${s.scenario} levels: ${levels.map(([name, v]) => `${name}: ${valuesText(v, LEVEL_KEYS)}`).join(" | ")}`);
+  }
+  return out;
 }
 
-function trialRow(t: Trial, anchorConfig: Trial["config"] | undefined, anchorValue: number | null, noise: number | null, direction: Direction): string {
+/** Where requests did not succeed in the latest measurement. */
+export function unhealthyLevels(t: Trial): string[] {
+  const m = t.measurements.at(-1);
+  return m ? unhealthyPoints(m.scenarios) : [];
+}
+
+function trialRow(t: Trial, anchorConfig: Trial["config"] | undefined, anchorValue: number | null, noise: number | null, direction: Direction, catalogue: Catalogue): string {
   const value = trialObjective(t);
   const delta = value !== null && anchorValue !== null && t.purpose !== "anchor" ? deltaText(value, anchorValue, noise, direction) : "";
   const parts = [
@@ -114,9 +116,8 @@ function trialRow(t: Trial, anchorConfig: Trial["config"] | undefined, anchorVal
     if (delta) parts.push(`vs anchor ${delta}`);
     if (!trialFeasible(t)) parts.push(`INFEASIBLE: ${t.measurements.flatMap((m) => m.breaches).join("; ") || "redline crossed"}`);
     const unhealthy = unhealthyLevels(t);
-    if (unhealthy.length) parts.push(`REQUESTS FAILED at ${unhealthy.join(", ")}`);
-    const levels = levelLine(t);
-    if (levels) parts.push(levels);
+    if (unhealthy.length) parts.push(`REQUESTS FAILED at ${unhealthy.join("; ")}`);
+    parts.push(...resultLines(t, catalogue));
   }
   if (t.engineWarnings?.length) parts.push(`engine warnings: ${t.engineWarnings.slice(0, 5).join(" / ")}${t.engineWarnings.length > 5 ? ` (+${t.engineWarnings.length - 5} more, inspect_trial)` : ""}`);
   if (t.failure) {
@@ -162,6 +163,7 @@ export function renderRecord(ctx: RecordContext): string {
   const b = budget(ctx);
   const hw = manifest.hardware;
   const screen = manifest.services?.benchmarks?.screen;
+  const catalogue = catalogueOf(manifest);
   const out: string[] = [];
 
   out.push("<lab_record>");
@@ -181,6 +183,25 @@ export function renderRecord(ctx: RecordContext): string {
   if (redlines.length) out.push(`- Redlines: ${JSON.stringify(redlines)}`);
   out.push(`- The verdict is the platform's own full-replay measurement of the finalists after the search. Screen numbers choose the finalists.`);
 
+  out.push("\n## What the screen benchmark measures");
+  const workload = (screen?.workload ?? []) as { scenario?: string; family?: string; params?: Record<string, unknown>; reads_as?: string }[];
+  if (workload.length) {
+    for (const w of workload) out.push(`- \`${w.scenario}\` (${w.family}): ${w.reads_as ?? "no description"}${w.params && Object.keys(w.params).length ? ` Params: ${JSON.stringify(w.params)}` : ""}`);
+  } else {
+    out.push("- The platform did not say what the screen sends; read it from the results.");
+  }
+  out.push("- Results are in the platform's measures: `name@stat[qualifier]` (`ttft_ms@p99`, `ttft_ms@p90[32k_64k]`, a prompt-length bucket). A measure means the same in every module. A missing one was not reported, not zero. Each ledger row shows the headline measures; `inspect_trial` has every one.");
+  const shown = new Set<string>();
+  for (const t of lab.trials) for (const s of t.measurements.at(-1)?.scenarios ?? []) {
+    for (const k of headlineKeys(s.operating, catalogue)) shown.add(k);
+    if (Object.keys(s.points).some((p) => /^c\d+$/.test(p))) for (const k of LEVEL_KEYS) shown.add(k);
+  }
+  const target = ctx.targetMetric.replace(/^[^/]*\//, "").replace(/:.*$/, "");
+  if (catalogue.size) {
+    const lines = glossary([target, ...shown], catalogue);
+    if (lines.length) out.push(...lines);
+  }
+
   out.push("\n## Rules the platform enforces");
   out.push(`- Forbidden parameters (keep the campaign's value; never change): ${ctx.forbidden.length ? ctx.forbidden.join(", ") : "none"}`);
   out.push("- Every value must be a string, number or boolean that survives the engine command line and back (no lists/objects; JSON flags as one JSON string). Never set placement (model_path, host, port, …).");
@@ -197,7 +218,7 @@ export function renderRecord(ctx: RecordContext): string {
   if (noise !== null) out.push(`Measurement noise so far: ±${(noise * 100).toFixed(1)}% (half the spread of repeated measurements of the same config).`);
   else out.push("Measurement noise: unknown until a config has been measured twice.");
   if (!lab.trials.length) out.push("- none yet");
-  for (const t of lab.trials) out.push(trialRow(t, anchor?.config, anchorValue, noise, direction));
+  for (const t of lab.trials) out.push(trialRow(t, anchor?.config, anchorValue, noise, direction, catalogue));
 
   out.push("\n## Current finalists (chosen by the harness: best feasible mean)");
   out.push(top.length ? contenderLines(top, anchor?.config).join("\n") : "- none yet");

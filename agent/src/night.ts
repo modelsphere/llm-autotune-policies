@@ -332,6 +332,14 @@ class Night {
   private async refreshContenders(): Promise<void> {
     const top = ranking(byConfig(this.lab.trials), this.direction).slice(0, this.manifest.contenders?.max ?? 2);
     if (!top.length) return;
+    // The platform's evidence is its own trial records, one per benchmark it
+    // measured; the lab's trial numbers mean nothing to it.
+    const platformTrial = new Map<number, number>();
+    try {
+      for (const t of await this.client.listTrials()) if (t.run_id !== null && t.run_id !== undefined) platformTrial.set(t.run_id, t.id);
+    } catch (err) {
+      if (!(err instanceof PhaseError)) this.log(`trials not read; contenders go without their evidence ids: ${(err as Error).message}`);
+    }
     const contenders: ContenderIn[] = top.map((g, index) => {
       const withEnv = g.trialIds.map((id) => this.lab.trial(id)).find((t) => t?.environment);
       return {
@@ -343,8 +351,11 @@ class Night {
           volumes: {},
           environment: withEnv?.environment ?? {},
         },
-        evidence: { screen_objective: g.mean, measurements: g.values.length, values: g.values, trials: g.trialIds },
-        trial_ids: [],
+        evidence: { screen_objective: g.mean, measurements: g.values.length, values: g.values, agent_trials: g.trialIds },
+        trial_ids: g.trialIds
+          .flatMap((id) => this.lab.trial(id)?.benchIds ?? [])
+          .map((bench) => platformTrial.get(bench))
+          .filter((id): id is number => id !== undefined),
       };
     });
     try {

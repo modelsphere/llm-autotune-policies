@@ -27,6 +27,33 @@ export function score(config: Config): number {
   return 1000 + (mem - 0.85) * 4000 + (chunk === 8192 ? 150 : 0);
 }
 
+/** A slice of the platform's measure catalogue, as the manifest carries it. */
+export const CATALOGUE = [
+  { name: "output_tpm_per_gpu", label: "Output tokens/min per GPU", unit: "tok/min/GPU", better: "higher", group: "throughput", meaning: "Generated tokens per minute, per GPU the config occupies.", stats: [] },
+  { name: "request_output_tps", label: "Per-request output speed", unit: "tok/s", better: "higher", group: "per request", meaning: "One request's output tokens per second.", stats: ["mean", "p10", "p50", "p90"] },
+  { name: "ttft_ms", label: "Time to first token", unit: "ms", better: "lower", group: "latency", meaning: "Time from sending a request to its first token.", stats: ["mean", "p50", "p90", "p99"] },
+  { name: "success_rate", label: "Success rate", unit: "", better: "higher", group: "health", meaning: "Share of requests that succeeded.", stats: [] },
+  { name: "error_rate", label: "Error rate", unit: "", better: "lower", group: "health", meaning: "Share of requests that errored.", stats: [] },
+  { name: "requests_completed", label: "Requests completed", unit: "requests", better: null, group: "health", meaning: "Requests that completed.", stats: [] },
+  { name: "concurrency", label: "Concurrency", unit: "requests", better: null, group: "workload", meaning: "Requests in flight.", stats: [] },
+];
+
+/** A config's replay result in measures. tp_size 8 drops a tenth of its requests. */
+export function replayMeasures(config: Config, value: number) {
+  const success = Number(config.tp_size ?? 1) === 8 ? 0.9 : 1;
+  return [{
+    scenario: "replay", module: "replay", kind: "replay", operating_level: null,
+    operating_rule: "the replay itself, at the concurrency it was run at",
+    operating: {
+      output_tpm_per_gpu: value * 60, "request_output_tps@mean": value / 16, "request_output_tps@p10": value / 20,
+      "ttft_ms@p50": 200, "ttft_ms@p99": 900, "ttft_ms@p90[32k_64k]": 2500, success_rate: success,
+      error_rate: 1 - success, requests_completed: 400 * success, concurrency: 16,
+    },
+    points: {},
+    supports: [],
+  }];
+}
+
 export class FakePlatform {
   readonly heartbeats: Record<string, unknown>[] = [];
   readonly events: { level: string; message: string }[] = [];
@@ -124,8 +151,19 @@ export class FakePlatform {
         tick_s: 10,
       },
       contenders: { max: 2, validation_suite: "verify", approx_minutes_each: 30 },
-      services: { launch: true, benchmarks: { screen: { slug: "screen", approx_minutes: 15, dataset_build_id: "" } }, state: true, diagnostics: true },
+      services: {
+        launch: true,
+        benchmarks: {
+          screen: {
+            slug: "screen", approx_minutes: 15, dataset_build_id: "",
+            workload: [{ scenario: "replay", module: "replay", family: "replay", params: { concurrency: 16 }, reads_as: "Recorded production requests, replayed at one fixed concurrency: there are no levels." }],
+          },
+        },
+        state: true,
+        diagnostics: true,
+      },
       prior: { contenders: [] },
+      measures: CATALOGUE,
     };
   }
 
@@ -145,6 +183,7 @@ export class FakePlatform {
       id, status: b.status, suite: "screen", failure_class: "", error: "", config, deviations: [],
       summary: b.status === "succeeded" ? { objective_value: value, feasible: true, constraints: [], breaches: [] } : null,
       metrics: b.status === "succeeded" ? { "perf.output_tps": value } : {},
+      measures: b.status === "succeeded" ? replayMeasures(config, value) : [],
     };
   }
 
@@ -232,6 +271,14 @@ export class FakePlatform {
           scenarios: [{ key: "sweep", kind: "sweep", levels: [1, 16, 64].map((c) => ({ concurrency: c, metrics: { output_tps: (v * c) / 64, ttft_p99_ms: 100 + c * 5 } })), best_level: { concurrency: 64, output_tps: v } }],
           metrics: {},
         });
+      }
+      if (req.method === "GET" && path === "/trials") {
+        // One platform trial per benchmark it measured, numbered apart from
+        // the agent's own trial numbers.
+        return send(200, [...this.benches.entries()].filter(([, b]) => b.status === "succeeded").map(([id], i) => ({
+          id: 1000 + id, seq: i + 1, config: {}, config_hash: "", source: "platform", run_id: id,
+          reported_metrics: {}, reported_objective_value: null, reported_feasible: null, failure_class: "", duration_seconds: null, notes: "",
+        })));
       }
       if (req.method === "PUT" && path === "/contenders") {
         this.contenders = body.contenders;

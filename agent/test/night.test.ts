@@ -119,10 +119,19 @@ test("a whole night: anchor, hypotheses, refusals, a diagnosed failure, confirma
     assert.ok([...platform.launches.values()].every((l) => l.released));
 
     // The best config is the registered contender, backed by a confirmation re-measure.
-    const best = platform.contenders[0] as { launch_spec: { engine_args: Record<string, unknown>; environment: Record<string, unknown> }; evidence: { measurements: number } };
+    const best = platform.contenders[0] as { launch_spec: { engine_args: Record<string, unknown>; environment: Record<string, unknown> }; evidence: { measurements: number }; trial_ids: number[] };
     assert.equal(best.launch_spec.engine_args.chunked_prefill_size, 8192);
     assert.equal(best.launch_spec.environment.image_digest, "sglang@sha256:abc");
     assert.ok(best.evidence.measurements >= 2, "the finalist was re-measured");
+    // Its evidence names the platform's own trials, one per measurement.
+    assert.equal(best.trial_ids.length, best.evidence.measurements);
+    assert.ok(best.trial_ids.every((id) => id > 1000), "platform trial ids, not the agent's numbers");
+
+    // The record reads the replay in measures, with what they mean.
+    const record = scripted.seen.at(-1) ?? "";
+    assert.ok(record.includes("replay: output_tpm_per_gpu"), "the replay's numbers are in the ledger");
+    assert.ok(record.includes("`success_rate` (ratio, higher is better)"), "the record explains its measures");
+    assert.ok(record.includes("there are no levels"), "the record says what the screen sends");
 
     // The plan declared the parameter the agent introduced outside the space.
     const lastPlan = platform.plans.at(-1) as { extras: { param: string }[] };

@@ -30,6 +30,13 @@
             "title": "Id",
             "type": "integer"
           },
+          "measures": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioMeasures"
+            },
+            "title": "Measures",
+            "type": "array"
+          },
           "metrics": {
             "additionalProperties": true,
             "title": "Metrics",
@@ -76,6 +83,14 @@
           "slug": {
             "title": "Slug",
             "type": "string"
+          },
+          "workload": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Workload",
+            "type": "array"
           }
         },
         "required": [
@@ -1580,6 +1595,70 @@
         "title": "ScenarioLevel",
         "type": "object"
       },
+      "ScenarioMeasures": {
+        "description": "One module's results as measures (docs/api/measures.md).",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "module": {
+            "title": "Module",
+            "type": "string"
+          },
+          "operating": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Operating",
+            "type": "object"
+          },
+          "operating_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operating Level"
+          },
+          "operating_rule": {
+            "default": "",
+            "title": "Operating Rule",
+            "type": "string"
+          },
+          "points": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "title": "Points",
+            "type": "object"
+          },
+          "scenario": {
+            "title": "Scenario",
+            "type": "string"
+          },
+          "supports": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Supports",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scenario",
+          "module",
+          "kind"
+        ],
+        "title": "ScenarioMeasures",
+        "type": "object"
+      },
       "ScenarioOut": {
         "properties": {
           "best_level": {
@@ -1682,6 +1761,14 @@
           },
           "hardware": {
             "$ref": "#/components/schemas/ManifestHardware"
+          },
+          "measures": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Measures",
+            "type": "array"
           },
           "model": {
             "$ref": "#/components/schemas/ManifestModel"
@@ -2057,8 +2144,9 @@
     }
   },
   "info": {
-    "title": "LLM AutoTune policy session API",
-    "version": "1.3"
+    "description": "\nAutomated parameter search for LLM inference engines (sglang, vLLM).\n\nA **campaign** searches a **search space** against an **objective**, on machines\nthe platform has been **leased**. Each point becomes a **run**: a container is\nlaunched with those engine arguments, benchmarked by LLMBench, and scored.\n\n### Authentication\n\nTwo credentials, both accepted on the lease endpoints:\n\n* **`Authorization: Bearer <jwt>`** \u2014 for people. `POST /api/auth/login`.\n* **`X-API-Key: atk_\u2026`** \u2014 for services. Minted at `POST /api/api-keys`, shown\n  once. Everything else takes the bearer token only.\n\n### Integrating a fleet manager\n\nThe **machine leases** section is the surface built for external callers. The\nshort version:\n\n```\nPOST /api/machines/lease           {\"name\": \"node-24\", \"host\": \"\u2026\", \"due_at\": \u2026}\nGET  /api/machines/node-24/lease     -> readiness: busy | idle | returnable\nPOST /api/machines/node-24/lease/end {\"mode\": \"polite\"}\n```\n\nEnding a lease is asynchronous. The machine is yours when `readiness` reads\n`returnable` \u2014 by which point the production service we found on it has been\nput back and verified.\n",
+    "title": "LLM AutoTune",
+    "version": "0.3.0"
   },
   "openapi": "3.1.0",
   "paths": {

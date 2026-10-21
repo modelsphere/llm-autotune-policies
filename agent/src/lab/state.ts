@@ -4,6 +4,7 @@
 // night (memory.ts). The model never edits it directly — only through tools.
 
 import type { Config } from "../contract/types.js";
+import type { ScenarioResult } from "./measures.js";
 
 export type TrialStatus =
   | "queued"
@@ -25,21 +26,13 @@ export interface Prediction {
   note?: string;
 }
 
-/** One concurrency level of a sweep, reduced to the metrics worth reading. */
-export interface Level {
-  concurrency: number;
-  metrics: Record<string, number>;
-}
-
 export interface Measurement {
   benchId: number;
   objective: number | null;
   feasible: boolean;
   breaches: string[];
-  /** Headline numbers of the benchmark (throughput per card, TTFT, …). */
-  headline: Record<string, number>;
-  levels: Level[];
-  bestLevel: Record<string, number>;
+  /** The benchmark's modules, in the platform's measures. */
+  scenarios: ScenarioResult[];
   at: string;
 }
 

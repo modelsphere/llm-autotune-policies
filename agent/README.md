@@ -47,12 +47,12 @@ lab rather than a chat:
 | Part | File | What it does |
 | --- | --- | --- |
 | Contract client and heartbeat | `src/contract/` | The policy API, typed from the platform's OpenAPI; a heartbeat on its own timer, so a model thinking for minutes never looks wedged. |
-| Lab state and statistics | `src/lab/` | The trial ledger, hypotheses, constraints, lessons; noise bands, the anomaly check, contender ranking. |
-| Lab record | `src/context/render.ts` | Rebuilt before every model request from the books and sent as the newest message: every trial with per-concurrency numbers, every diagnosed failure, constraints, lessons, earlier nights, the time left. Never trimmed. |
+| Lab state and statistics | `src/lab/` | The trial ledger, hypotheses, constraints, lessons; noise bands, the anomaly check, contender ranking. Results are kept in the platform's measures (`src/lab/measures.ts`), so a replay, a sweep and any other module are read, compared and checked for failed requests the same way. |
+| Lab record | `src/context/render.ts` | Rebuilt before every model request from the books and sent as the newest message: what the screen benchmark sends, every trial's measures (each sweep level too) with the catalogue's meaning of each, every diagnosed failure, constraints, lessons, earlier nights, the time left. Never trimmed. |
 | Driver | `src/driver.ts` | Wraps pi's `Agent`: the record via `transformContext`, lab events via `steer`/`followUp`, turn retries, trimming only the conversation (after asking the model to write down what it learned). |
 | Tools | `src/tools.ts` | The model's only verbs: `propose`, `check`, `inspect_trial`, `read_log`, `compare`, `remeasure`, `cancel_trial`, `open_hypothesis`, `close_hypothesis`, `add_constraint`, `record_lesson`, `done`. No shell, no files. |
 | Runner | `src/runner.ts` | Places trials on cards and ports, runs launch → benchmark → results → release, captures the engine's environment and resolved arguments, diagnoses failures. |
-| Night | `src/night.ts` | The lifecycle: plan (with the parameters the model introduced, declared as extras), anchor, nudges when cards sit idle, confirmation, contenders, state, finalize. |
+| Night | `src/night.ts` | The lifecycle: plan (with the parameters the model introduced, declared as extras), anchor, nudges when cards sit idle, confirmation, contenders (with the platform's own trial ids as evidence), state, finalize. |
 | Prompts | `prompts/` | The system prompt (the search protocol) and the diagnostician. The main tuning surface. |
 
 ## Configuration

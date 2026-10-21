@@ -11,6 +11,7 @@ import type { Config, Manifest } from "./contract/types.js";
 import { configKey, type LabState, now, type Prediction, type Trial } from "./lab/state.js";
 import { configText, diffText } from "./lab/space.js";
 import { byConfig, deltaText, type Direction, noiseBand, trialObjective } from "./lab/stats.js";
+import { catalogueOf, deltas } from "./lab/measures.js";
 import type { TrialRunner } from "./runner.js";
 
 export interface ToolContext {
@@ -71,6 +72,7 @@ function truncateJson(value: unknown, limit: number): string {
 
 export function buildTools(ctx: ToolContext): AgentTool<any>[] {
   const { client, lab, runner } = ctx;
+  const catalogue = catalogueOf(ctx.manifest);
   const anchorConfig = () => lab.anchor?.config;
 
   const propose = tool({
@@ -166,7 +168,7 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
   const inspectTrial = tool({
     name: "inspect_trial",
     label: "Inspect trial",
-    description: "Everything about one trial: every benchmark level's metrics, the failure and its log excerpt, the engine's own resolved arguments (when it reports them), its environment.",
+    description: "Everything about one trial: every measure of every benchmark module (and each sweep level), the failure and its log excerpt, the engine's own resolved arguments (when it reports them), its environment.",
     parameters: Type.Object({ id: Type.Integer() }),
     execute: async (params) => {
       const t = trialOr404(lab, params.id);
@@ -199,7 +201,7 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
   const compare = tool({
     name: "compare",
     label: "Compare",
-    description: "Two trials side by side: config difference, objective delta with the noise band, and per-concurrency metric deltas.",
+    description: "Two trials side by side: config difference, objective delta with the noise band, and every measure's change per benchmark module (and per sweep level), marked better or worse.",
     parameters: Type.Object({ a: Type.Integer(), b: Type.Integer() }),
     execute: async (params) => {
       const a = trialOr404(lab, params.a);
@@ -211,15 +213,18 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
         `#${b.id} vs #${a.id}: ${diffText(b.config, a.config)}`,
         `objective: #${a.id} ${va ?? "—"} → #${b.id} ${vb ?? "—"}${va !== null && vb !== null ? ` (${deltaText(vb, va, noise, ctx.direction)})` : ""}`,
       ];
-      const la = a.measurements.at(-1)?.levels ?? [];
-      const lb = b.measurements.at(-1)?.levels ?? [];
-      for (const level of lb) {
-        const other = la.find((l) => l.concurrency === level.concurrency);
+      const sa = a.measurements.at(-1)?.scenarios ?? [];
+      const sb = b.measurements.at(-1)?.scenarios ?? [];
+      for (const s of sb) {
+        const other = sa.find((x) => x.scenario === s.scenario);
         if (!other) continue;
-        const parts = Object.keys(level.metrics)
-          .filter((k) => k in other.metrics && other.metrics[k] !== 0)
-          .map((k) => `${k} ${(((level.metrics[k] - other.metrics[k]) / Math.abs(other.metrics[k])) * 100).toFixed(1)}%`);
-        lines.push(`c${level.concurrency}: ${parts.join(", ")}`);
+        const at = s.operatingLevel || other.operatingLevel ? ` (#${a.id} at ${other.operatingLevel ?? "—"}, #${b.id} at ${s.operatingLevel ?? "—"})` : "";
+        lines.push(`${s.scenario} operating point${at}: ${deltas(other.operating, s.operating, catalogue).join(", ") || "no change"}`);
+        for (const [point, values] of Object.entries(s.points)) {
+          if (!other.points[point]) continue;
+          const d = deltas(other.points[point], values, catalogue);
+          if (d.length) lines.push(`${s.scenario} ${point}: ${d.join(", ")}`);
+        }
       }
       return text(lines.join("\n"));
     },

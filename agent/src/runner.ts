@@ -263,13 +263,7 @@ export class TrialRunner {
       this.fail(trial, "bench", bench.failure_class || bench.status, bench.error ?? "");
       return;
     }
-    let results = null;
-    try {
-      results = await this.client.benchmarkResults(bench.id);
-    } catch (err) {
-      this.hooks.log(`t${trial.id}: full results unavailable: ${(err as Error).message}`);
-    }
-    trial.measurements.push(measurementOf(bench, results));
+    trial.measurements.push(measurementOf(bench));
   }
 
   private async recordWhatRuns(trial: Trial, launch: LaunchOut): Promise<void> {
