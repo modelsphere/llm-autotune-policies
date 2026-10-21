@@ -253,12 +253,27 @@ class Night {
     }
   }
 
+  /** The card width of what the agent is running now: the narrowest of its
+   *  last few proposals that launched, else the anchor's. */
+  private nudgeWidth(): number {
+    const recent = this.lab.trials
+      .filter((t) => t.purpose !== "anchor" && t.cards > 0 && t.status !== "failed")
+      .slice(-5)
+      .map((t) => t.cards);
+    if (recent.length) return Math.min(...recent);
+    return this.lab.anchor?.cards || 1;
+  }
+
   /** The model went quiet with cards free and nothing queued: remind it, and
    *  after enough fruitless reminders, call the search done. */
   private maybeNudge(): void {
     const { lab, runner, driver } = this;
     if (lab.done || driver.busy) return;
-    if (lab.trials.some((t) => t.status === "queued") || runner.freeSlots() === 0) return;
+    // A slot is room for the configs the agent is running, not one spare card:
+    // seven cards hold three tp=2 trials and leave one that fits none of them,
+    // and nudging about that card ended a night with nine hours left.
+    const width = this.nudgeWidth();
+    if (lab.trials.some((t) => t.status === "queued") || runner.freeSlots(width) === 0) return;
     const b = budget(this.recordContext());
     if (b.minutesLeft !== null && b.minutesLeft < b.perTrial) return;
     if (Date.now() - this.lastNudge < 30000) return;
@@ -269,7 +284,7 @@ class Night {
     this.nudges += 1;
     this.lastNudge = Date.now();
     driver.notify(
-      `${runner.freeSlots()} slot(s) are free and nothing is queued, with room for about ${b.trialsLeft ?? "?"} more trial(s). Idle cards are wasted GPU time: propose the next experiments (the declared space is only a hint — any engine parameter that is not forbidden may be tried), or call done if nothing left could beat the finalists.`,
+      `${runner.freeSlots(width)} slot(s) of ${width} card(s) are free and nothing is queued, with room for about ${b.trialsLeft ?? "?"} more trial(s). Idle cards are wasted GPU time: propose the next experiments (the declared space is only a hint — any engine parameter that is not forbidden may be tried), or call done if nothing left could beat the finalists.`,
     );
   }
 
