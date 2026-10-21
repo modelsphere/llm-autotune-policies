@@ -329,7 +329,16 @@ class Night {
 
   /** The best feasible configs, as the platform's contenders. Re-registered
    *  after every trial: what is registered when we die is what gets validated. */
-  private async refreshContenders(): Promise<void> {
+  private contendersQueue: Promise<void> = Promise.resolve();
+
+  /** One update at a time: two trials finishing together must not send two
+   *  overlapping lists (the later one waits and sends the newer ranking). */
+  private refreshContenders(): Promise<void> {
+    this.contendersQueue = this.contendersQueue.then(() => this.sendContenders());
+    return this.contendersQueue;
+  }
+
+  private async sendContenders(): Promise<void> {
     const top = ranking(byConfig(this.lab.trials), this.direction).slice(0, this.manifest.contenders?.max ?? 2);
     if (!top.length) return;
     // The platform's evidence is its own trial records, one per benchmark it
