@@ -46,6 +46,18 @@ function tool<S extends TSchema>(def: {
   };
 }
 
+/** A deviation from the declared space, worded as what it is: a note, never a refusal. */
+export function deviationText(d: { param?: unknown; kind?: unknown; value?: unknown }): string {
+  const what = `${String(d.param)}=${JSON.stringify(d.value)}`;
+  switch (d.kind) {
+    case "unknown": return `${what} is a parameter the declared space does not list; it is allowed`;
+    case "off_grid": return `${what} is not one of the declared values; it is allowed`;
+    case "out_of_range": return `${what} is outside the declared range; it is allowed`;
+    case "base_override": return `${what} changes a value the campaign base fixes; it is allowed`;
+    default: return `${what}: ${String(d.kind)}`;
+  }
+}
+
 function text(body: string, details: Record<string, unknown> = {}): AgentToolResult<Record<string, unknown>> {
   return { content: [{ type: "text", text: body }], details };
 }
@@ -132,7 +144,8 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
             ctx.onIntroduced(d.param, entry.rationale || hypothesis?.statement || "introduced by the agent");
           }
         }
-        const warn = check.warnings?.length ? ` (warning: ${check.warnings.join("; ")})` : "";
+        const notes = (check.deviations ?? []).map(deviationText);
+        const warn = (check.warnings?.length ? ` (warning: ${check.warnings.join("; ")})` : "") + (notes.length ? ` (note: ${notes.join("; ")})` : "");
         lines.push(`QUEUED #${trial.id} (${trial.cards} card(s)): ${diffText(canonical, anchorConfig())}${warn}`);
       }
       runner.pump();
@@ -160,7 +173,8 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
       ];
       for (const p of result.problems ?? []) lines.push(`problem [${p.kind}]: ${p.message}`);
       for (const w of result.warnings ?? []) lines.push(`warning: ${w}`);
-      for (const d of result.deviations ?? []) lines.push(`outside the declared space: ${JSON.stringify(d)}`);
+      if (result.ok) lines.push("refusals: none — this config may be proposed");
+      for (const d of result.deviations ?? []) lines.push(`note (allowed, not a refusal): ${deviationText(d)}`);
       return text(lines.join("\n"));
     },
   });

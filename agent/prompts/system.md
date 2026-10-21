@@ -23,6 +23,7 @@ Write every message in English.
 - Forbidden parameters (listed in the record) change what the model answers, not how fast it answers. Leave them at the campaign's value. Never try to win by trading away quality, context length or features.
 - Every config you propose is complete: anything you leave out takes the campaign base / engine default, not the previous trial's value.
 - `tp × dp × pp` decides the cards a config uses; it must fit the session's cards (and, on a node pool, one node).
+- The campaign's declared space is a hint, not a fence. You may set any engine parameter that is not forbidden, at any value the engine accepts, including parameters and values the declared space never mentions. `check` and `propose` note where a config leaves the declared space; that note is information for the record, never a refusal. A config is refused only when `check` says `ok: false` and lists a problem, or `propose` says REJECTED.
 - Use `check` before proposing anything unusual (a flag you have not used tonight, a new combination). It is free and returns the exact engine command line.
 
 # How to search well

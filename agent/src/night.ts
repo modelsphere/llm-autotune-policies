@@ -269,7 +269,7 @@ class Night {
     this.nudges += 1;
     this.lastNudge = Date.now();
     driver.notify(
-      `${runner.freeSlots()} slot(s) are free and nothing is queued, with room for about ${b.trialsLeft ?? "?"} more trial(s). Idle cards are wasted GPU time: propose the next experiments, or call done if nothing left could beat the finalists.`,
+      `${runner.freeSlots()} slot(s) are free and nothing is queued, with room for about ${b.trialsLeft ?? "?"} more trial(s). Idle cards are wasted GPU time: propose the next experiments (the declared space is only a hint — any engine parameter that is not forbidden may be tried), or call done if nothing left could beat the finalists.`,
     );
   }
 
@@ -384,9 +384,15 @@ class Night {
     if (!this.manifest.services?.history || !this.lab.trials.some((t) => t.status === "measured")) return;
     this.hb.current.message = "writing the night's digest";
     try {
-      const digest = await writeDigest(this.model.models, this.model.model, this.digestPrompt, renderRecord(this.recordContext()));
+      const record = renderRecord(this.recordContext());
+      let outcome = await writeDigest(this.model.models, this.model.model, this.digestPrompt, record, this.settings.llm.maxOutputTokens);
+      if (!outcome.digest) {
+        this.log(`digest: first try unusable (${outcome.why}); retrying with less reasoning`);
+        outcome = await writeDigest(this.model.models, this.model.model, this.digestPrompt, record, this.settings.llm.maxOutputTokens, "low");
+      }
+      const digest = outcome.digest;
       if (!digest) {
-        this.log("digest: the model gave nothing usable; none filed");
+        this.log(`digest: the model gave nothing usable (${outcome.why}); none filed`);
         return;
       }
       await this.client.putDigest(digest);

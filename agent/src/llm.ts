@@ -117,31 +117,39 @@ export async function writeDigest(
   model: Model<"openai-completions">,
   prompt: string,
   record: string,
-): Promise<Digest | null> {
+  maxOutputTokens: number,
+  reasoning: "low" | "medium" = "medium",
+): Promise<{ digest: Digest | null; why: string }> {
+  // A reasoning model spends part of the budget thinking; too small a cap ends
+  // the answer before its JSON begins.
   const response = await models.completeSimple(
     model,
     { systemPrompt: prompt, messages: [{ role: "user", content: record, timestamp: Date.now() }] },
-    { reasoning: "medium", maxTokens: 8000 },
+    { reasoning, maxTokens: Math.max(32000, maxOutputTokens) },
   );
-  if (response.stopReason === "error" || response.stopReason === "aborted") return null;
   const text = response.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("");
+  const why = `stop ${response.stopReason}, ${text.length} chars of text${response.errorMessage ? `, ${response.errorMessage.slice(0, 200)}` : ""}`;
+  if (response.stopReason === "error" || response.stopReason === "aborted") return { digest: null, why };
   const match = /\{[\s\S]*\}/.exec(text);
-  if (!match) return null;
+  if (!match) return { digest: null, why: `${why}, no JSON object` };
   try {
     const raw = JSON.parse(match[0]) as Partial<Digest>;
-    if (!raw.summary || typeof raw.summary !== "string") return null;
+    if (!raw.summary || typeof raw.summary !== "string") return { digest: null, why: `${why}, no summary` };
     const strings = (v: unknown, max: number, len: number) =>
       (Array.isArray(v) ? v : []).filter((x): x is string => typeof x === "string" && x.trim() !== "").slice(0, max).map((x) => x.slice(0, len));
     return {
-      summary: raw.summary.slice(0, 20000),
-      lessons: (Array.isArray(raw.lessons) ? raw.lessons : [])
-        .filter((l) => l && typeof l.text === "string" && l.text.trim() !== "")
-        .slice(0, 50)
-        .map((l) => ({ text: l.text.slice(0, 2000), scope: SCOPES.has(String(l.scope)) ? String(l.scope) : "campaign" })),
-      constraints: strings(raw.constraints, 50, 2000),
-      open_questions: strings(raw.open_questions, 20, 2000),
+      why,
+      digest: {
+        summary: raw.summary.slice(0, 20000),
+        lessons: (Array.isArray(raw.lessons) ? raw.lessons : [])
+          .filter((l) => l && typeof l.text === "string" && l.text.trim() !== "")
+          .slice(0, 50)
+          .map((l) => ({ text: l.text.slice(0, 2000), scope: SCOPES.has(String(l.scope)) ? String(l.scope) : "campaign" })),
+        constraints: strings(raw.constraints, 50, 2000),
+        open_questions: strings(raw.open_questions, 20, 2000),
+      },
     };
-  } catch {
-    return null;
+  } catch (err) {
+    return { digest: null, why: `${why}, JSON did not parse: ${(err as Error).message.slice(0, 120)}` };
   }
 }
