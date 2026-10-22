@@ -35,6 +35,8 @@ export interface Settings {
   pollMs: number;
   /** Nudges without a new proposal before the harness treats the search as done. */
   nudgeLimit: number;
+  /** May the agent end the search while time for more trials remains? */
+  allowEarlyDone: boolean;
 }
 
 const THINKING: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
@@ -106,5 +108,6 @@ export function resolveSettings(env: NodeJS.ProcessEnv, params: Record<string, u
     outageMinutes: num(params.outage_minutes, 20),
     pollMs: num(env.AGENT_POLL_SECONDS, 10) * 1000,
     nudgeLimit: num(params.nudge_limit, 3),
+    allowEarlyDone: bool(params.allow_early_done, false),
   };
 }

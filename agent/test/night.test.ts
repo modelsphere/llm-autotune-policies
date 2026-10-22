@@ -87,7 +87,7 @@ function scriptedModel(opts: { stallMs?: number } = {}) {
       return fauxAssistantMessage(
         [
           fauxToolCall("record_lesson", { text: "chunked_prefill_size 8192 helps on this workload", scope: "campaign" }, { id: "c6" }),
-          fauxToolCall("done", { reason: "the space around the best is covered", confirm: true }, { id: "c7" }),
+          fauxToolCall("done", { reason: "the space around the best is covered" }, { id: "c7" }),
         ],
         { stopReason: "toolUse" },
       );
@@ -99,7 +99,7 @@ function scriptedModel(opts: { stallMs?: number } = {}) {
 }
 
 test("a whole night: anchor, hypotheses, refusals, a diagnosed failure, confirmation, finalize, exit", async () => {
-  const platform = new FakePlatform({ space: { grid: { mem_fraction_static: [0.85, 0.9] } }, production: { mem_fraction_static: 0.85 } });
+  const platform = new FakePlatform({ space: { grid: { mem_fraction_static: [0.85, 0.9] } }, production: { mem_fraction_static: 0.85 }, params: { allow_early_done: true } });
   await platform.start();
   const lines: string[] = [];
   try {
@@ -160,14 +160,14 @@ test("a whole night: anchor, hypotheses, refusals, a diagnosed failure, confirma
 });
 
 test("the next night reads what the last one learned", async () => {
-  const first = new FakePlatform({ space: { grid: { mem_fraction_static: [0.85, 0.9] } } });
+  const first = new FakePlatform({ space: { grid: { mem_fraction_static: [0.85, 0.9] } }, params: { allow_early_done: true } });
   await first.start();
   try {
     await runNight({ env: first.env, model: scriptedModel(), log: () => {}, tickMs: 10 });
   } finally {
     await first.stop();
   }
-  const second = new FakePlatform({ space: { grid: { mem_fraction_static: [0.85, 0.9] } }, state: first.state, sessionId: 8 });
+  const second = new FakePlatform({ space: { grid: { mem_fraction_static: [0.85, 0.9] } }, state: first.state, sessionId: 8, params: { allow_early_done: true } });
   await second.start();
   try {
     const scripted = scriptedModel();
@@ -182,7 +182,7 @@ test("the next night reads what the last one learned", async () => {
 });
 
 test("the heartbeat keeps beating while the model thinks", async () => {
-  const platform = new FakePlatform({ space: { grid: { mem_fraction_static: [0.85, 0.9] } }, heartbeatIntervalS: 0.05 });
+  const platform = new FakePlatform({ space: { grid: { mem_fraction_static: [0.85, 0.9] } }, heartbeatIntervalS: 0.05, params: { allow_early_done: true } });
   await platform.start();
   try {
     const scripted = scriptedModel({ stallMs: 600 });

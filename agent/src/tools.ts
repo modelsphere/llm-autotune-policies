@@ -23,6 +23,8 @@ export interface ToolContext {
   sessionId: number;
   /** Estimated trials that still fit before the search deadline. */
   trialsLeft(): number | null;
+  /** The campaign lets the agent end the search before its deadline. */
+  allowEarlyDone: boolean;
   /** A new parameter outside the declared space was introduced. */
   onIntroduced(param: string, reason: string): void;
   onProposed(trials: Trial[]): void;
@@ -330,13 +332,13 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
   const done = tool({
     name: "done",
     label: "Done",
-    description: "End the search early. Only when you are confident more trials will not beat the finalists. Refused while budget for 2+ trials remains unless confirm=true with a reason that says why.",
-    parameters: Type.Object({ reason: Type.String(), confirm: Type.Optional(Type.Boolean()) }),
+    description: "End the search. Refused while time for 2 or more trials remains before the search deadline: that GPU time is the search's, and validation has its own reserve after it.",
+    parameters: Type.Object({ reason: Type.String() }),
     execute: async (params) => {
       const left = ctx.trialsLeft();
-      if (!params.confirm && left !== null && left >= 2) {
+      if (!ctx.allowEarlyDone && left !== null && left >= 2) {
         throw new Error(
-          `about ${left} more trial(s) still fit before the deadline — GPU time that is reserved for this search. Keep exploring, or call done again with confirm=true and a reason why nothing left could beat the finalists.`,
+          `refused: about ${left} more trial(s) fit before the search deadline, and the finalists' validation has its own time after it. Spend them on what makes the verdict trustworthy: re-measure the finalists, ablate the leading stack one change at a time to find which parts carry the gain, test combinations you have not measured, or try a lever you have not touched.`,
         );
       }
       lab.done = { reason: params.reason, at: now() };

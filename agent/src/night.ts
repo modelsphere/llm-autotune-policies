@@ -145,6 +145,7 @@ class Night {
       direction: this.direction,
       sessionId: manifest.session_id,
       trialsLeft: () => budget(this.recordContext()).trialsLeft,
+      allowEarlyDone: settings.allowEarlyDone,
       onIntroduced: (param, reason) => {
         if (lab.introduced.has(param)) return;
         lab.introduced.set(param, reason);
@@ -278,8 +279,13 @@ class Night {
     if (b.minutesLeft !== null && b.minutesLeft < b.perTrial) return;
     if (Date.now() - this.lastNudge < 30000) return;
     if (this.nudges >= this.settings.nudgeLimit) {
-      this.end("the agent stopped proposing");
-      return;
+      // Ending early is the agent's call only where the campaign allows it;
+      // otherwise keep reminding it, less often, until the deadline.
+      if (this.settings.allowEarlyDone || (b.trialsLeft !== null && b.trialsLeft < 2)) {
+        this.end("the agent stopped proposing");
+        return;
+      }
+      if (Date.now() - this.lastNudge < 5 * 60000) return;
     }
     this.nudges += 1;
     this.lastNudge = Date.now();
