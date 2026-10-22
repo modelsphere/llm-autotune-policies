@@ -23,6 +23,10 @@ export interface ToolContext {
   sessionId: number;
   /** Estimated trials that still fit before the search deadline. */
   trialsLeft(): number | null;
+  /** The campaign lets the agent end the search before its deadline. */
+  allowEarlyDone: boolean;
+  /** done was refused for the time left; the reason the agent gave. */
+  onDoneRefused(reason: string): void;
   /** A new parameter outside the declared space was introduced. */
   onIntroduced(param: string, reason: string): void;
   onProposed(trials: Trial[]): void;
@@ -44,6 +48,18 @@ function tool<S extends TSchema>(def: {
     parameters: def.parameters,
     execute: (_toolCallId: string, params: unknown) => def.execute(params as Static<S>),
   };
+}
+
+/** A deviation from the declared space, worded as what it is: a note, never a refusal. */
+export function deviationText(d: { param?: unknown; kind?: unknown; value?: unknown }): string {
+  const what = `${String(d.param)}=${JSON.stringify(d.value)}`;
+  switch (d.kind) {
+    case "unknown": return `${what} is a parameter the declared space does not list; it is allowed`;
+    case "off_grid": return `${what} is not one of the declared values; it is allowed`;
+    case "out_of_range": return `${what} is outside the declared range; it is allowed`;
+    case "base_override": return `${what} changes a value the campaign base fixes; it is allowed`;
+    default: return `${what}: ${String(d.kind)}`;
+  }
 }
 
 function text(body: string, details: Record<string, unknown> = {}): AgentToolResult<Record<string, unknown>> {
@@ -132,13 +148,14 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
             ctx.onIntroduced(d.param, entry.rationale || hypothesis?.statement || "introduced by the agent");
           }
         }
-        const warn = check.warnings?.length ? ` (warning: ${check.warnings.join("; ")})` : "";
+        const notes = (check.deviations ?? []).map(deviationText);
+        const warn = (check.warnings?.length ? ` (warning: ${check.warnings.join("; ")})` : "") + (notes.length ? ` (note: ${notes.join("; ")})` : "");
         lines.push(`QUEUED #${trial.id} (${trial.cards} card(s)): ${diffText(canonical, anchorConfig())}${warn}`);
       }
       runner.pump();
       if (accepted.length) ctx.onProposed(accepted);
       const queued = lab.trials.filter((t) => t.status === "queued").length;
-      lines.push(`Now: ${runner.inFlight} running, ${queued} queued, ${runner.freeSlots()} slot(s) free.`);
+      lines.push(`Now: ${runner.inFlight} running, ${queued} queued, ${runner.freeCardCount} of ${runner.totalCards} card(s) free.`);
       return text(lines.join("\n"), { accepted: accepted.map((t) => t.id) });
     },
   });
@@ -160,7 +177,8 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
       ];
       for (const p of result.problems ?? []) lines.push(`problem [${p.kind}]: ${p.message}`);
       for (const w of result.warnings ?? []) lines.push(`warning: ${w}`);
-      for (const d of result.deviations ?? []) lines.push(`outside the declared space: ${JSON.stringify(d)}`);
+      if (result.ok) lines.push("refusals: none — this config may be proposed");
+      for (const d of result.deviations ?? []) lines.push(`note (allowed, not a refusal): ${deviationText(d)}`);
       return text(lines.join("\n"));
     },
   });
@@ -316,13 +334,14 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
   const done = tool({
     name: "done",
     label: "Done",
-    description: "End the search early. Only when you are confident more trials will not beat the finalists. Refused while budget for 2+ trials remains unless confirm=true with a reason that says why.",
-    parameters: Type.Object({ reason: Type.String(), confirm: Type.Optional(Type.Boolean()) }),
+    description: "End the search. Refused while time for 2 or more trials remains before the search deadline: that GPU time is the search's, and validation has its own reserve after it.",
+    parameters: Type.Object({ reason: Type.String() }),
     execute: async (params) => {
       const left = ctx.trialsLeft();
-      if (!params.confirm && left !== null && left >= 2) {
+      if (!ctx.allowEarlyDone && left !== null && left >= 2) {
+        ctx.onDoneRefused(params.reason);
         throw new Error(
-          `about ${left} more trial(s) still fit before the deadline — GPU time that is reserved for this search. Keep exploring, or call done again with confirm=true and a reason why nothing left could beat the finalists.`,
+          `refused: about ${left} more trial(s) fit before the search deadline, and the finalists' validation has its own time after it. Spend them on what makes the verdict trustworthy: re-measure the finalists, ablate the leading stack one change at a time to find which parts carry the gain, test combinations you have not measured, or try a lever you have not touched. If nothing is worth running, propose nothing: once the cards sit idle through a few reminders, the search ends.`,
         );
       }
       lab.done = { reason: params.reason, at: now() };

@@ -98,8 +98,11 @@ Advanced → **Policy parameters** (`policy.params` in the manifest):
 | `max_tokens_per_night` | `0` (no limit) | Stop asking the model after this many tokens. |
 | `anomaly_threshold` | `0.15` | Re-bench a result this much better than the best so far. |
 | `confirm_top_k` | `2` | Finalists re-measured near the end. |
-| `outage_minutes` | `20` | Finalize if the model stays unreachable this long. |
-| `nudge_limit` | `3` | Reminders with idle cards and no proposal before the search is called done. |
+| `outage_minutes` | `60` | End the search if model calls keep failing this long. |
+| `llm_timeout_minutes` | `20` | How long one model request may take (env `LLM_TIMEOUT_MINUTES`). |
+| `llm_max_retries` | `4` | Retries of a throttled or dropped request within one call, before the harness retries the call itself (env `LLM_MAX_RETRIES`). |
+| `nudge_limit` | `3` | Reminders with idle cards and no proposal before the search ends — only once the model has asked to end (a `done` refused for the time left), when `allow_early_done` is on, or when under two trials of time remain. Otherwise the reminders slow to one every 5 minutes. |
+| `allow_early_done` | `false` | Let the model end the search while time for two or more trials remains. Off, `done` is refused until then and the search uses its whole budget; the validation reserve after it is the platform's either way. |
 
 The campaign's forbidden-parameter list (Advanced → *Parameters the policy may
 not change*) is what keeps the model from "winning" by trading quality away —

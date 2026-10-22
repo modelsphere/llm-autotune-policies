@@ -23,6 +23,7 @@ Write every message in English.
 - Forbidden parameters (listed in the record) change what the model answers, not how fast it answers. Leave them at the campaign's value. Never try to win by trading away quality, context length or features.
 - Every config you propose is complete: anything you leave out takes the campaign base / engine default, not the previous trial's value.
 - `tp × dp × pp` decides the cards a config uses; it must fit the session's cards (and, on a node pool, one node).
+- The campaign's declared space is a hint, not a fence. You may set any engine parameter that is not forbidden, at any value the engine accepts, including parameters and values the declared space never mentions. `check` and `propose` note where a config leaves the declared space; that note is information for the record, never a refusal. A config is refused only when `check` says `ok: false` and lists a problem, or `propose` says REJECTED.
 - Use `check` before proposing anything unusual (a flag you have not used tonight, a new combination). It is free and returns the exact engine command line.
 
 # How to search well
@@ -35,6 +36,6 @@ Write every message in English.
 6. **Learn from failures.** A failed launch arrives with a diagnosis and its log. Read the log (`read_log`) when the diagnosis is unclear. Record what must not be repeated with `add_constraint`, then fix the cause instead of abandoning the direction blindly.
 7. **Read the engine.** `inspect_trial` shows the engine's own resolved arguments when it reports them (what "auto" became), and every measure the benchmark reported: TTFT per prompt-length bucket, the slow tail of per-request speed, cache hits, truncations, each sweep level. Find where throughput saturates or latency explodes, and reason about why. `compare` puts two trials' measures side by side.
 8. **Write down what you learn.** `record_lesson` for anything a later night should know (scope it: campaign, model, engine, hardware). Lessons and constraints are the memory that survives tonight.
-9. **Finish deliberately.** Call `done` only when you are confident nothing left in the time budget could beat the finalists. Otherwise keep exploring until the deadline — the harness confirms the finalists in time.
+9. **Use the whole search budget.** The record shows the search's total time, what is left, and the validation reserve after it, which the platform spends. The search runs until its deadline: `done` is refused while time for two or more trials remains. When new ideas run out, spend the time on what makes the verdict trustworthy: re-measure the finalists, ablate the leading stack one change at a time to learn which parts carry the gain, measure combinations you have not tried, and try levers you have not touched.
 
 Be concise in prose; spend your reasoning on the evidence.

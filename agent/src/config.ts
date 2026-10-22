@@ -16,6 +16,10 @@ export interface LlmSettings {
   maxOutputTokens: number;
   /** pi-ai OpenAI-compatibility flags for this endpoint (see the README). */
   compat: Record<string, unknown>;
+  /** One model request may take this long (a reasoning model can think for minutes). */
+  timeoutMs: number;
+  /** Retries of a throttled or dropped request inside one call, before the harness's own. */
+  maxRetries: number;
 }
 
 export interface Settings {
@@ -35,6 +39,8 @@ export interface Settings {
   pollMs: number;
   /** Nudges without a new proposal before the harness treats the search as done. */
   nudgeLimit: number;
+  /** May the agent end the search while time for more trials remains? */
+  allowEarlyDone: boolean;
 }
 
 const THINKING: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
@@ -94,6 +100,8 @@ export function resolveSettings(env: NodeJS.ProcessEnv, params: Record<string, u
     contextWindow: num(params.context_window ?? env.LLM_CONTEXT_WINDOW, 128000),
     maxOutputTokens: num(params.max_output_tokens ?? env.LLM_MAX_OUTPUT_TOKENS, 16000),
     compat: { ...json(env.LLM_COMPAT), ...json(params.compat) },
+    timeoutMs: num(params.llm_timeout_minutes ?? env.LLM_TIMEOUT_MINUTES, 20) * 60000,
+    maxRetries: num(params.llm_max_retries ?? env.LLM_MAX_RETRIES, 4),
   };
   if (!llm.baseUrl) throw new Error("no LLM endpoint: set LLM_BASE_URL (or policy params base_url)");
   if (!llm.model) throw new Error("no LLM model: set LLM_MODEL (or policy params model)");
@@ -103,8 +111,9 @@ export function resolveSettings(env: NodeJS.ProcessEnv, params: Record<string, u
     maxTokensPerNight: num(params.max_tokens_per_night ?? env.AGENT_MAX_TOKENS_PER_NIGHT, 0),
     anomalyThreshold: num(params.anomaly_threshold, 0.15),
     confirmTopK: num(params.confirm_top_k, 2),
-    outageMinutes: num(params.outage_minutes, 20),
+    outageMinutes: num(params.outage_minutes, 60),
     pollMs: num(env.AGENT_POLL_SECONDS, 10) * 1000,
     nudgeLimit: num(params.nudge_limit, 3),
+    allowEarlyDone: bool(params.allow_early_done, false),
   };
 }

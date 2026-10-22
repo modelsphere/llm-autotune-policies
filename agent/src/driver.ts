@@ -30,6 +30,9 @@ export interface DriverOptions {
   contextWindow: number;
   maxOutputTokens: number;
   outageMinutes: number;
+  /** Per-request timeout and in-call retries for the model endpoint. */
+  requestTimeoutMs?: number;
+  requestRetries?: number;
   /** The lab record, rendered fresh. */
   record(): string;
   log(line: string): void;
@@ -78,7 +81,15 @@ export class AgentDriver {
     this.sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
     this.agent = new Agent({
       initialState: { systemPrompt: opts.systemPrompt, model: opts.model, tools: opts.tools, thinkingLevel: opts.thinking },
-      streamFn: opts.models.streamSimple.bind(opts.models),
+      // A throttled endpoint or a dropped connection is retried inside the
+      // call first; a call that still fails is retried by afterRun, and only
+      // a failure lasting outageMinutes ends the search.
+      streamFn: (model, context, options) =>
+        opts.models.streamSimple(model, context, {
+          ...options,
+          timeoutMs: opts.requestTimeoutMs,
+          maxRetries: opts.requestRetries,
+        }),
       convertToLlm: (messages) => messages.filter((m) => STANDARD_ROLES.has(m.role)) as Message[],
       transformContext: async (messages) => this.contextFor(messages),
       // Tools change the lab's books; one at a time keeps every result

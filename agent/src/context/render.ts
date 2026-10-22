@@ -36,7 +36,8 @@ export interface RecordContext {
   targetMetric: string;
   forbidden: string[];
   totalCards: number;
-  freeSlots: number;
+  freeCards: number;
+  running: { id: number; cards: number }[];
   inFlight: number;
   sessionId: number;
   nowMs?: number;
@@ -72,6 +73,37 @@ export function budget(ctx: RecordContext): { minutesLeft: number | null; perTri
   const parallel = Math.max(1, Math.min(ports, ctx.totalCards ? Math.floor(ctx.totalCards / typicalCards) : ports));
   const trialsLeft = minutesLeft === null ? null : Math.floor(minutesLeft / perTrial) * parallel;
   return { minutesLeft, perTrial, trialsLeft, parallel };
+}
+
+/** Cards in use and free, and what each running trial holds. */
+export function cardsNow(total: number, free: number, running: { id: number; cards: number }[]): string {
+  if (!total) return `${running.length} trial(s) running`;
+  const held = running.length ? ` (${running.map((r) => `#${r.id}: ${r.cards}`).join(", ")})` : "";
+  return `${total - free} of ${total} card(s) in use by ${running.length} trial(s)${held}, ${free} free`;
+}
+
+/** The night's clock: how long the search has in all, how much is left, and
+ *  the validation reserve after it that the platform spends, not the agent. */
+export function timeLines(
+  time: { started_at?: string | null; search_deadline?: string | null; hard_deadline?: string | null },
+  minutesLeft: number | null,
+  nowMs: number,
+): string[] {
+  const at = (s?: string | null) => (s ? Date.parse(s) : null);
+  const start = at(time.started_at), search = at(time.search_deadline), hard = at(time.hard_deadline);
+  if (search === null) return ["- Search ends: no deadline"];
+  const lines: string[] = [];
+  if (start !== null) {
+    const total = (search - start) / 60000;
+    const used = Math.max(0, (nowMs - start) / 60000);
+    lines.push(`- Search budget: ${fmt(total, 0)} min in all (${time.started_at} to ${time.search_deadline}); ${fmt(used, 0)} min used, ${fmt(minutesLeft ?? 0, 0)} min left (${fmt(total > 0 ? (100 * (minutesLeft ?? 0)) / total : 0, 0)}%)`);
+  } else {
+    lines.push(`- Search ends ${time.search_deadline} — ${fmt(minutesLeft ?? 0, 0)} min left`);
+  }
+  if (hard !== null && hard > search) {
+    lines.push(`- After the search: ${fmt((hard - search) / 60000, 0)} min reserved for the platform to validate the finalists (until ${time.hard_deadline}). It is not yours to spend and needs nothing from you; \`done\` is refused while time for 2+ trials of the search remains.`);
+  }
+  return lines;
 }
 
 function median(values: number[]): number | null {
@@ -172,9 +204,9 @@ export function renderRecord(ctx: RecordContext): string {
   out.push("\n## Tonight");
   out.push(`- Model: ${manifest.model.served_model_name} on ${manifest.model.engine}, image ${manifest.model.image}`);
   out.push(`- Hardware: ${hw.machine} — ${hw.gpu_type || "unknown GPU"}, ${ctx.totalCards} card(s)${hw.pool ? ` (a pool of ${hw.node_count} node(s), at most ${hw.node_gpu_max || "?"} cards per launch)` : ""}, ${hw.ports?.length ?? 0} port(s)`);
-  out.push(`- Search ends ${manifest.time.search_deadline ?? "(no deadline)"}${b.minutesLeft !== null ? ` — ${fmt(b.minutesLeft, 0)} min left` : ""}`);
+  out.push(...timeLines(manifest.time, b.minutesLeft, ctx.nowMs ?? Date.now()));
   out.push(`- One trial takes ~${fmt(b.perTrial, 0)} min (launch to release); up to ${b.parallel} at once → room for about ${b.trialsLeft ?? "?"} more trial(s)`);
-  out.push(`- Now: ${ctx.inFlight} trial(s) running, ${lab.trials.filter((t) => t.status === "queued").length} queued, ${ctx.freeSlots} slot(s) free`);
+  out.push(`- Now: ${cardsNow(ctx.totalCards, ctx.freeCards, ctx.running)}, ${lab.trials.filter((t) => t.status === "queued").length} queued. Trials may use different card counts side by side; a queued one starts when enough cards are free.`);
   if (ctx.tokenLimit) out.push(`- Model tokens used: ${ctx.tokensUsed ?? 0} of ${ctx.tokenLimit}`);
 
   out.push("\n## Objective");

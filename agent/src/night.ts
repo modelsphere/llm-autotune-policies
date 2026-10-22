@@ -79,6 +79,8 @@ class Night {
   private endedReason = "";
   private confirmed = false;
   private nudges = 0;
+  /** The reason of a done the harness refused, until the agent proposes again. */
+  private doneRequested = "";
   private lastNudge = 0;
   private announced = false;
   private readonly tickMs: number;
@@ -145,13 +147,18 @@ class Night {
       direction: this.direction,
       sessionId: manifest.session_id,
       trialsLeft: () => budget(this.recordContext()).trialsLeft,
+      allowEarlyDone: settings.allowEarlyDone,
       onIntroduced: (param, reason) => {
         if (lab.introduced.has(param)) return;
         lab.introduced.set(param, reason);
         this.putPlan().catch((err) => log(`plan update failed: ${(err as Error).message}`));
       },
+      onDoneRefused: (reason) => {
+        this.doneRequested = reason;
+      },
       onProposed: (trials) => {
         this.nudges = 0;
+        this.doneRequested = "";
         const hypotheses = [...new Set(trials.map((t) => t.hypothesisId).filter(Boolean))];
         client
           .event("info", `agent queued ${trials.map((t) => `#${t.id}`).join(", ")}${hypotheses.length ? ` to test ${hypotheses.join(", ")}` : ""}: ${trials.map((t) => diffText(t.config, lab.anchor?.config)).join(" | ")}`)
@@ -169,6 +176,8 @@ class Night {
       contextWindow: settings.llm.contextWindow,
       maxOutputTokens: settings.llm.maxOutputTokens,
       outageMinutes: settings.outageMinutes,
+      requestTimeoutMs: settings.llm.timeoutMs,
+      requestRetries: settings.llm.maxRetries,
       record: () => renderRecord(this.recordContext()),
       log,
     });
@@ -253,23 +262,45 @@ class Night {
     }
   }
 
+  /** The card width of what the agent is running now: the narrowest of its
+   *  last few proposals that launched, else the anchor's. */
+  private nudgeWidth(): number {
+    const recent = this.lab.trials
+      .filter((t) => t.purpose !== "anchor" && t.cards > 0 && t.status !== "failed")
+      .slice(-5)
+      .map((t) => t.cards);
+    if (recent.length) return Math.min(...recent);
+    return this.lab.anchor?.cards || 1;
+  }
+
   /** The model went quiet with cards free and nothing queued: remind it, and
    *  after enough fruitless reminders, call the search done. */
   private maybeNudge(): void {
     const { lab, runner, driver } = this;
     if (lab.done || driver.busy) return;
-    if (lab.trials.some((t) => t.status === "queued") || runner.freeSlots() === 0) return;
+    // A slot is room for the configs the agent is running, not one spare card:
+    // seven cards hold three tp=2 trials and leave one that fits none of them,
+    // and nudging about that card ended a night with nine hours left.
+    const width = this.nudgeWidth();
+    if (lab.trials.some((t) => t.status === "queued") || runner.freeSlots(width) === 0) return;
     const b = budget(this.recordContext());
     if (b.minutesLeft !== null && b.minutesLeft < b.perTrial) return;
     if (Date.now() - this.lastNudge < 30000) return;
     if (this.nudges >= this.settings.nudgeLimit) {
-      this.end("the agent stopped proposing");
-      return;
+      // Ending early is the agent's call only where the campaign allows it;
+      // otherwise keep reminding it, less often, until the deadline.
+      // It ends when the agent asked to (done, refused for the time left)
+      // and still proposes nothing: out of ideas, by its own account.
+      if (this.settings.allowEarlyDone || this.doneRequested || (b.trialsLeft !== null && b.trialsLeft < 2)) {
+        this.end(this.doneRequested ? `the agent asked to end and proposed nothing more: ${this.doneRequested}` : "the agent stopped proposing");
+        return;
+      }
+      if (Date.now() - this.lastNudge < 5 * 60000) return;
     }
     this.nudges += 1;
     this.lastNudge = Date.now();
     driver.notify(
-      `${runner.freeSlots()} slot(s) are free and nothing is queued, with room for about ${b.trialsLeft ?? "?"} more trial(s). Idle cards are wasted GPU time: propose the next experiments, or call done if nothing left could beat the finalists.`,
+      `${runner.freeCardCount} of ${runner.totalCards} card(s) are free and nothing is queued, with room for about ${b.trialsLeft ?? "?"} more trial(s). Idle cards are wasted GPU time: propose the next experiments (the declared space is only a hint — any engine parameter that is not forbidden may be tried).${this.doneRequested ? " You asked to end the search; if nothing is worth running, say so and the search ends after a few of these reminders." : ""}`,
     );
   }
 
@@ -294,7 +325,7 @@ class Night {
       const d = trial.failure.diagnosis;
       line += `: failed at ${trial.failure.stage} (${trial.failure.failureClass})${d ? ` — ${d.cause}${d.offending_flag ? ` [flag ${d.offending_flag}]` : ""}` : ""}`;
     }
-    return `${line}. ${this.runner.freeSlots()} slot(s) free. The lab record has the details.`;
+    return `${line}. ${this.runner.freeCardCount} of ${this.runner.totalCards} card(s) free. The lab record has the details.`;
   }
 
   private async diagnoseFailure(trial: Trial, excerpt: string) {
@@ -384,9 +415,15 @@ class Night {
     if (!this.manifest.services?.history || !this.lab.trials.some((t) => t.status === "measured")) return;
     this.hb.current.message = "writing the night's digest";
     try {
-      const digest = await writeDigest(this.model.models, this.model.model, this.digestPrompt, renderRecord(this.recordContext()));
+      const record = renderRecord(this.recordContext());
+      let outcome = await writeDigest(this.model.models, this.model.model, this.digestPrompt, record, this.settings.llm.maxOutputTokens);
+      if (!outcome.digest) {
+        this.log(`digest: first try unusable (${outcome.why}); retrying with less reasoning`);
+        outcome = await writeDigest(this.model.models, this.model.model, this.digestPrompt, record, this.settings.llm.maxOutputTokens, "low");
+      }
+      const digest = outcome.digest;
       if (!digest) {
-        this.log("digest: the model gave nothing usable; none filed");
+        this.log(`digest: the model gave nothing usable (${outcome.why}); none filed`);
         return;
       }
       await this.client.putDigest(digest);
@@ -425,7 +462,8 @@ class Night {
       targetMetric: this.targetMetric,
       forbidden: this.forbidden,
       totalCards: this.runner.totalCards,
-      freeSlots: this.runner.freeSlots(Math.max(1, typical)),
+      freeCards: this.runner.freeCardCount,
+      running: this.runner.runningCards(),
       inFlight: this.runner.inFlight,
       sessionId: this.manifest.session_id,
       tokensUsed: this.driver?.tokens,
