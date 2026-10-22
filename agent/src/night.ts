@@ -79,6 +79,8 @@ class Night {
   private endedReason = "";
   private confirmed = false;
   private nudges = 0;
+  /** The reason of a done the harness refused, until the agent proposes again. */
+  private doneRequested = "";
   private lastNudge = 0;
   private announced = false;
   private readonly tickMs: number;
@@ -151,8 +153,12 @@ class Night {
         lab.introduced.set(param, reason);
         this.putPlan().catch((err) => log(`plan update failed: ${(err as Error).message}`));
       },
+      onDoneRefused: (reason) => {
+        this.doneRequested = reason;
+      },
       onProposed: (trials) => {
         this.nudges = 0;
+        this.doneRequested = "";
         const hypotheses = [...new Set(trials.map((t) => t.hypothesisId).filter(Boolean))];
         client
           .event("info", `agent queued ${trials.map((t) => `#${t.id}`).join(", ")}${hypotheses.length ? ` to test ${hypotheses.join(", ")}` : ""}: ${trials.map((t) => diffText(t.config, lab.anchor?.config)).join(" | ")}`)
@@ -170,6 +176,8 @@ class Night {
       contextWindow: settings.llm.contextWindow,
       maxOutputTokens: settings.llm.maxOutputTokens,
       outageMinutes: settings.outageMinutes,
+      requestTimeoutMs: settings.llm.timeoutMs,
+      requestRetries: settings.llm.maxRetries,
       record: () => renderRecord(this.recordContext()),
       log,
     });
@@ -281,8 +289,10 @@ class Night {
     if (this.nudges >= this.settings.nudgeLimit) {
       // Ending early is the agent's call only where the campaign allows it;
       // otherwise keep reminding it, less often, until the deadline.
-      if (this.settings.allowEarlyDone || (b.trialsLeft !== null && b.trialsLeft < 2)) {
-        this.end("the agent stopped proposing");
+      // It ends when the agent asked to (done, refused for the time left)
+      // and still proposes nothing: out of ideas, by its own account.
+      if (this.settings.allowEarlyDone || this.doneRequested || (b.trialsLeft !== null && b.trialsLeft < 2)) {
+        this.end(this.doneRequested ? `the agent asked to end and proposed nothing more: ${this.doneRequested}` : "the agent stopped proposing");
         return;
       }
       if (Date.now() - this.lastNudge < 5 * 60000) return;
@@ -290,7 +300,7 @@ class Night {
     this.nudges += 1;
     this.lastNudge = Date.now();
     driver.notify(
-      `${runner.freeSlots(width)} slot(s) of ${width} card(s) are free and nothing is queued, with room for about ${b.trialsLeft ?? "?"} more trial(s). Idle cards are wasted GPU time: propose the next experiments (the declared space is only a hint — any engine parameter that is not forbidden may be tried), or call done if nothing left could beat the finalists.`,
+      `${runner.freeCardCount} of ${runner.totalCards} card(s) are free and nothing is queued, with room for about ${b.trialsLeft ?? "?"} more trial(s). Idle cards are wasted GPU time: propose the next experiments (the declared space is only a hint — any engine parameter that is not forbidden may be tried).${this.doneRequested ? " You asked to end the search; if nothing is worth running, say so and the search ends after a few of these reminders." : ""}`,
     );
   }
 
@@ -315,7 +325,7 @@ class Night {
       const d = trial.failure.diagnosis;
       line += `: failed at ${trial.failure.stage} (${trial.failure.failureClass})${d ? ` — ${d.cause}${d.offending_flag ? ` [flag ${d.offending_flag}]` : ""}` : ""}`;
     }
-    return `${line}. ${this.runner.freeSlots()} slot(s) free. The lab record has the details.`;
+    return `${line}. ${this.runner.freeCardCount} of ${this.runner.totalCards} card(s) free. The lab record has the details.`;
   }
 
   private async diagnoseFailure(trial: Trial, excerpt: string) {
@@ -452,7 +462,8 @@ class Night {
       targetMetric: this.targetMetric,
       forbidden: this.forbidden,
       totalCards: this.runner.totalCards,
-      freeSlots: this.runner.freeSlots(Math.max(1, typical)),
+      freeCards: this.runner.freeCardCount,
+      running: this.runner.runningCards(),
       inFlight: this.runner.inFlight,
       sessionId: this.manifest.session_id,
       tokensUsed: this.driver?.tokens,

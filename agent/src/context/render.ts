@@ -36,7 +36,8 @@ export interface RecordContext {
   targetMetric: string;
   forbidden: string[];
   totalCards: number;
-  freeSlots: number;
+  freeCards: number;
+  running: { id: number; cards: number }[];
   inFlight: number;
   sessionId: number;
   nowMs?: number;
@@ -72,6 +73,13 @@ export function budget(ctx: RecordContext): { minutesLeft: number | null; perTri
   const parallel = Math.max(1, Math.min(ports, ctx.totalCards ? Math.floor(ctx.totalCards / typicalCards) : ports));
   const trialsLeft = minutesLeft === null ? null : Math.floor(minutesLeft / perTrial) * parallel;
   return { minutesLeft, perTrial, trialsLeft, parallel };
+}
+
+/** Cards in use and free, and what each running trial holds. */
+export function cardsNow(total: number, free: number, running: { id: number; cards: number }[]): string {
+  if (!total) return `${running.length} trial(s) running`;
+  const held = running.length ? ` (${running.map((r) => `#${r.id}: ${r.cards}`).join(", ")})` : "";
+  return `${total - free} of ${total} card(s) in use by ${running.length} trial(s)${held}, ${free} free`;
 }
 
 /** The night's clock: how long the search has in all, how much is left, and
@@ -198,7 +206,7 @@ export function renderRecord(ctx: RecordContext): string {
   out.push(`- Hardware: ${hw.machine} — ${hw.gpu_type || "unknown GPU"}, ${ctx.totalCards} card(s)${hw.pool ? ` (a pool of ${hw.node_count} node(s), at most ${hw.node_gpu_max || "?"} cards per launch)` : ""}, ${hw.ports?.length ?? 0} port(s)`);
   out.push(...timeLines(manifest.time, b.minutesLeft, ctx.nowMs ?? Date.now()));
   out.push(`- One trial takes ~${fmt(b.perTrial, 0)} min (launch to release); up to ${b.parallel} at once → room for about ${b.trialsLeft ?? "?"} more trial(s)`);
-  out.push(`- Now: ${ctx.inFlight} trial(s) running, ${lab.trials.filter((t) => t.status === "queued").length} queued, ${ctx.freeSlots} slot(s) free`);
+  out.push(`- Now: ${cardsNow(ctx.totalCards, ctx.freeCards, ctx.running)}, ${lab.trials.filter((t) => t.status === "queued").length} queued. Trials may use different card counts side by side; a queued one starts when enough cards are free.`);
   if (ctx.tokenLimit) out.push(`- Model tokens used: ${ctx.tokensUsed ?? 0} of ${ctx.tokenLimit}`);
 
   out.push("\n## Objective");

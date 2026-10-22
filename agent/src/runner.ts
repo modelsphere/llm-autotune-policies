@@ -66,6 +66,16 @@ export class TrialRunner {
     return this.lab.trials.filter((t) => this.running.has(t.id)).reduce((n, t) => n + t.gpuIndices.length, 0);
   }
 
+  /** Cards free right now (0 when the session has no card list). */
+  get freeCardCount(): number {
+    return this.hasCards ? this.freeCards.length : 0;
+  }
+
+  /** Cards each running trial holds. */
+  runningCards(): { id: number; cards: number }[] {
+    return this.lab.trials.filter((t) => this.running.has(t.id)).map((t) => ({ id: t.id, cards: t.gpuIndices.length }));
+  }
+
   get inFlight(): number {
     return this.running.size;
   }

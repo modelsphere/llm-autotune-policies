@@ -25,6 +25,8 @@ export interface ToolContext {
   trialsLeft(): number | null;
   /** The campaign lets the agent end the search before its deadline. */
   allowEarlyDone: boolean;
+  /** done was refused for the time left; the reason the agent gave. */
+  onDoneRefused(reason: string): void;
   /** A new parameter outside the declared space was introduced. */
   onIntroduced(param: string, reason: string): void;
   onProposed(trials: Trial[]): void;
@@ -153,7 +155,7 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
       runner.pump();
       if (accepted.length) ctx.onProposed(accepted);
       const queued = lab.trials.filter((t) => t.status === "queued").length;
-      lines.push(`Now: ${runner.inFlight} running, ${queued} queued, ${runner.freeSlots()} slot(s) free.`);
+      lines.push(`Now: ${runner.inFlight} running, ${queued} queued, ${runner.freeCardCount} of ${runner.totalCards} card(s) free.`);
       return text(lines.join("\n"), { accepted: accepted.map((t) => t.id) });
     },
   });
@@ -337,8 +339,9 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
     execute: async (params) => {
       const left = ctx.trialsLeft();
       if (!ctx.allowEarlyDone && left !== null && left >= 2) {
+        ctx.onDoneRefused(params.reason);
         throw new Error(
-          `refused: about ${left} more trial(s) fit before the search deadline, and the finalists' validation has its own time after it. Spend them on what makes the verdict trustworthy: re-measure the finalists, ablate the leading stack one change at a time to find which parts carry the gain, test combinations you have not measured, or try a lever you have not touched.`,
+          `refused: about ${left} more trial(s) fit before the search deadline, and the finalists' validation has its own time after it. Spend them on what makes the verdict trustworthy: re-measure the finalists, ablate the leading stack one change at a time to find which parts carry the gain, test combinations you have not measured, or try a lever you have not touched. If nothing is worth running, propose nothing: once the cards sit idle through a few reminders, the search ends.`,
         );
       }
       lab.done = { reason: params.reason, at: now() };
