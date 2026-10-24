@@ -41,6 +41,8 @@ export interface Settings {
   nudgeLimit: number;
   /** May the agent end the search while time for more trials remains? */
   allowEarlyDone: boolean;
+  /** Cards left idle this long (minutes) are filled by the harness; 0 = never. */
+  keepBusyMinutes: number;
 }
 
 const THINKING: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
@@ -115,5 +117,6 @@ export function resolveSettings(env: NodeJS.ProcessEnv, params: Record<string, u
     pollMs: num(env.AGENT_POLL_SECONDS, 10) * 1000,
     nudgeLimit: num(params.nudge_limit, 3),
     allowEarlyDone: bool(params.allow_early_done, false),
+    keepBusyMinutes: num(params.keep_busy_minutes, 3),
   };
 }

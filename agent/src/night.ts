@@ -19,7 +19,7 @@ import { AgentDriver } from "./driver.js";
 import { buildModel, diagnose, writeDigest } from "./llm.js";
 import { applyMemory, loadMemory, snapshot } from "./memory.js";
 import { LabState, type Trial } from "./lab/state.js";
-import { diffText, sweptKeys } from "./lab/space.js";
+import { diffText, sweptKeys, variedText } from "./lab/space.js";
 import { byConfig, deltaText, type Direction, noiseBand, ranking, trialObjective, anchorValue as anchorMean } from "./lab/stats.js";
 import { TrialRunner } from "./runner.js";
 import { buildTools } from "./tools.js";
@@ -79,9 +79,9 @@ class Night {
   private endedReason = "";
   private confirmed = false;
   private nudges = 0;
-  /** The reason of a done the harness refused, until the agent proposes again. */
-  private doneRequested = "";
   private lastNudge = 0;
+  /** Since when cards have sat free with nothing queued (null while busy). */
+  private idleSince: number | null = null;
   private announced = false;
   private readonly tickMs: number;
 
@@ -154,11 +154,10 @@ class Night {
         this.putPlan().catch((err) => log(`plan update failed: ${(err as Error).message}`));
       },
       onDoneRefused: (reason) => {
-        this.doneRequested = reason;
+        log(`done refused (time for more trials remains): ${reason}`);
       },
       onProposed: (trials) => {
         this.nudges = 0;
-        this.doneRequested = "";
         const hypotheses = [...new Set(trials.map((t) => t.hypothesisId).filter(Boolean))];
         client
           .event("info", `agent queued ${trials.map((t) => `#${t.id}`).join(", ")}${hypotheses.length ? ` to test ${hypotheses.join(", ")}` : ""}: ${trials.map((t) => diffText(t.config, lab.anchor?.config)).join(" | ")}`)
@@ -218,6 +217,7 @@ class Night {
       }
       this.maybeConfirm();
       this.maybeNudge();
+      this.maybeKeepBusy();
       this.updateStatus();
       if (lab.done && runner.idle) {
         this.endedReason ||= lab.done.reason;
@@ -288,11 +288,10 @@ class Night {
     if (Date.now() - this.lastNudge < 30000) return;
     if (this.nudges >= this.settings.nudgeLimit) {
       // Ending early is the agent's call only where the campaign allows it;
-      // otherwise keep reminding it, less often, until the deadline.
-      // It ends when the agent asked to (done, refused for the time left)
-      // and still proposes nothing: out of ideas, by its own account.
-      if (this.settings.allowEarlyDone || this.doneRequested || (b.trialsLeft !== null && b.trialsLeft < 2)) {
-        this.end(this.doneRequested ? `the agent asked to end and proposed nothing more: ${this.doneRequested}` : "the agent stopped proposing");
+      // otherwise keep reminding it, less often, until the deadline (and the
+      // harness keeps the cards busy meanwhile, see maybeKeepBusy).
+      if (this.settings.allowEarlyDone || (b.trialsLeft !== null && b.trialsLeft < 2)) {
+        this.end("the agent stopped proposing");
         return;
       }
       if (Date.now() - this.lastNudge < 5 * 60000) return;
@@ -300,7 +299,55 @@ class Night {
     this.nudges += 1;
     this.lastNudge = Date.now();
     driver.notify(
-      `${runner.freeCardCount} of ${runner.totalCards} card(s) are free and nothing is queued, with room for about ${b.trialsLeft ?? "?"} more trial(s). Idle cards are wasted GPU time: propose the next experiments (the declared space is only a hint — any engine parameter that is not forbidden may be tried).${this.doneRequested ? " You asked to end the search; if nothing is worth running, say so and the search ends after a few of these reminders." : ""}`,
+      `${runner.freeCardCount} of ${runner.totalCards} card(s) are free and nothing is queued, with room for about ${b.trialsLeft ?? "?"} more trial(s). Idle cards are wasted GPU time: propose the next experiments (the declared space is only a hint — any engine parameter that is not forbidden may be tried).`,
+    );
+  }
+
+  /** Cards the agent leaves idle are the harness's to fill. The platform ends
+   *  a session that runs nothing for a while, and an agent that believes it
+   *  has converged proposes nothing: together they ended a 60-hour search
+   *  after 11. So past a few idle minutes, re-measure the closest-ranked
+   *  configs (fewest measurements first) in the free slots, which sharpens
+   *  the verdict, and steer the agent to widen the search. */
+  private maybeKeepBusy(): void {
+    const { lab, runner } = this;
+    const width = this.nudgeWidth();
+    const idle = !lab.done && this.settings.keepBusyMinutes > 0
+      && !lab.trials.some((t) => t.status === "queued") && runner.freeSlots(width) > 0;
+    if (!idle) {
+      this.idleSince = null;
+      return;
+    }
+    const b = budget(this.recordContext());
+    if (b.minutesLeft !== null && b.minutesLeft < b.perTrial) return;
+    this.idleSince ??= Date.now();
+    const idleMinutes = (Date.now() - this.idleSince) / 60000;
+    if (idleMinutes < this.settings.keepBusyMinutes) return;
+    this.idleSince = null;
+
+    const busy = new Set(lab.trials.filter((t) => !["measured", "failed", "cancelled"].includes(t.status)).map((t) => t.key));
+    const picks = ranking(byConfig(lab.trials), this.direction)
+      .slice(0, 6)
+      .filter((g) => g.feasible && !busy.has(g.key))
+      .map((g, rank) => ({ g, rank }))
+      .sort((a, c) => a.g.values.length - c.g.values.length || a.rank - c.rank)
+      .slice(0, runner.freeSlots(width));
+    const queued: Trial[] = [];
+    for (const { g } of picks) {
+      const of = lab.trial(g.trialIds[0])!;
+      queued.push(lab.addTrial({ purpose: "remeasure", config: of.config, cards: of.cards, remeasureOf: of.id, rationale: "harness: the cards sat idle; re-measure a close finalist" }));
+    }
+    if (queued.length) runner.pump();
+    const ids = queued.map((t) => `#${t.id}`).join(", ");
+    this.log(`cards idle ${idleMinutes.toFixed(1)} min: ${queued.length ? `harness queued ${ids}` : "nothing to re-measure"}`);
+    if (queued.length) this.client.event("info", `agent idle with cards free; the harness queued re-measures ${ids}`).catch(() => undefined);
+    const hours = b.minutesLeft === null ? "" : ` with about ${(b.minutesLeft / 60).toFixed(1)} h of search left`;
+    const tried = variedText(lab.trials.filter((t) => t.purpose !== "anchor").map((t) => t.config), lab.anchor?.config);
+    this.driver.notify(
+      `The cards sat idle for ${idleMinutes.toFixed(0)} min${hours}${queued.length ? `, so the harness queued ${ids} (re-measures of close finalists) to keep them working` : ""}. ` +
+        "A plateau around one stack is not the end of the search: the time left is the search's, and validation has its own. " +
+        `What tonight has set away from production so far: ${tried}. ` +
+        "Widen the search: levers you have not touched (the engine's other scheduler, memory, attention, CUDA-graph, overlap/compile, parallelism and speculative-decoding options — `check` any you have not used), larger moves away from the current stack, values beyond the range tried, combinations of levers measured only alone, and ablations of the leading stack. Propose the next experiments now.",
     );
   }
 

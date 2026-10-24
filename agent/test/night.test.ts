@@ -227,3 +227,39 @@ test("a finalize while the model is mid-call ends the night cleanly", async () =
     await platform.stop();
   }
 });
+
+test("an agent that goes quiet does not leave the cards idle or end the search", async () => {
+  const platform = new FakePlatform({ space: { grid: { mem_fraction_static: [0.85, 0.9] } }, params: { keep_busy_minutes: 0.003 } });
+  await platform.start();
+  const lines: string[] = [];
+  try {
+    // Proposes once, then only waits — as if it believed the search converged.
+    const faux = fauxProvider({ models: [{ id: "quiet", reasoning: true, contextWindow: 200000, maxTokens: 8000 }] });
+    const models = createModels();
+    models.setProvider(faux.provider);
+    let first = true;
+    const events: string[] = [];
+    const respond = async (context: TranscriptContext): Promise<AssistantMessage> => {
+      for (const m of context.messages) if (textOf(m).startsWith("[lab event")) events.push(textOf(m));
+      if (!first) return fauxAssistantMessage(fauxText("Converged; waiting."));
+      first = false;
+      return fauxAssistantMessage(
+        [fauxToolCall("propose", { configs: [{ engine_args: { mem_fraction_static: 0.9 } }], prediction: { direction: "up" } }, { id: "q1" })],
+        { stopReason: "toolUse" },
+      );
+    };
+    faux.setResponses(Array.from({ length: 2000 }, () => respond));
+    const night = runNight({ env: platform.env, model: { models, model: faux.getModel() as never }, log: (l) => lines.push(l), tickMs: 10 });
+    await new Promise((r) => setTimeout(r, 2000));
+    platform.command = "finalize";
+    assert.equal(await night, 0);
+
+    assert.ok(lines.some((l) => l.includes("harness queued")), "the harness filled the idle cards");
+    assert.ok(platform.events.some((e) => e.message.includes("the harness queued re-measures")));
+    assert.ok(events.some((e) => e.includes("Widen the search") && e.includes("mem_fraction_static (0.9)")), "the agent was steered to widen, told what it tried");
+    assert.ok(!platform.heartbeats.some((b) => b.status === "exhausted"), "the search did not end itself");
+    assert.ok(platform.launches.size > 3, `only ${platform.launches.size} launches`);
+  } finally {
+    await platform.stop();
+  }
+});

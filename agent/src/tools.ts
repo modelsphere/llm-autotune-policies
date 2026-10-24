@@ -341,7 +341,7 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
       if (!ctx.allowEarlyDone && left !== null && left >= 2) {
         ctx.onDoneRefused(params.reason);
         throw new Error(
-          `refused: about ${left} more trial(s) fit before the search deadline, and the finalists' validation has its own time after it. Spend them on what makes the verdict trustworthy: re-measure the finalists, ablate the leading stack one change at a time to find which parts carry the gain, test combinations you have not measured, or try a lever you have not touched. If nothing is worth running, propose nothing: once the cards sit idle through a few reminders, the search ends.`,
+          `refused: about ${left} more trial(s) fit before the search deadline, and the finalists' validation has its own time after it. Spend them on what makes the verdict trustworthy: re-measure the finalists, ablate the leading stack one change at a time to find which parts carry the gain, test combinations you have not measured, or try a lever you have not touched. The cards are not left idle: when you propose nothing, the harness re-measures the finalists in the free slots and asks again.`,
         );
       }
       lab.done = { reason: params.reason, at: now() };

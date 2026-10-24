@@ -47,6 +47,28 @@ export function diffText(config: Config, reference: Config | undefined): string 
   return parts.length ? parts.join(" ") : "(same as production)";
 }
 
+/** "kv_cache_dtype (fp8_e4m3, fp8_e5m2); chunked_prefill_size (8192, 24576)" —
+ *  every parameter the configs set away from `reference`, with the values tried. */
+export function variedText(configs: Config[], reference: Config | undefined, maxValues = 6): string {
+  const ref = reference ?? {};
+  const varied = new Map<string, Set<string>>();
+  for (const config of configs) {
+    for (const key of Object.keys(config)) {
+      if (key in ref && show(ref[key]) === show(config[key])) continue;
+      if (!varied.has(key)) varied.set(key, new Set());
+      varied.get(key)!.add(show(config[key]));
+    }
+  }
+  if (!varied.size) return "nothing yet";
+  return [...varied.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, values]) => {
+      const shown = [...values].slice(0, maxValues);
+      return `${key} (${shown.join(", ")}${values.size > shown.length ? `, +${values.size - shown.length} more` : ""})`;
+    })
+    .join("; ");
+}
+
 export function configText(config: Config): string {
   const keys = Object.keys(config).sort();
   return keys.length ? keys.map((k) => `${k}=${show(config[k])}`).join(" ") : "(engine defaults)";
