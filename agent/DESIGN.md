@@ -1,5 +1,7 @@
 # How the agent policy works
 
+[中文](DESIGN.zh.md)
+
 ![The agent loop](docs/agent-loop.svg)
 
 **The idea.** A language model plays the role of a performance engineer: it
