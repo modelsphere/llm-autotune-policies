@@ -19,14 +19,16 @@ test("an entry reads as the key a config sets, with its facts and recommendation
   assert.equal(vocabLine(flag), '- `attention_backend` (str; one of "fa3", "triton") — x = y (from the engine\'s code)');
 });
 
-test("the platform's search hint and long choice lists read briefly in the record", () => {
-  const backend = { kind: "flag" as const, name: "attention_backend", type: "str", choices: ["a", "b", "c", "d", "e", "f", "g"], level: "high", suggested: { values: ["fa3", "flashinfer"] } };
-  assert.equal(vocabLine(backend), '- `attention_backend` (str; one of 7 values (engine_vocab lists them)) [high; try fa3, flashinfer]');
+test("long choice lists read briefly in the record; the engine's own check shows on lookup", () => {
+  const backend = { kind: "flag" as const, name: "attention_backend", type: "str", choices: ["a", "b", "c", "d", "e", "f", "g"], level: "high" };
+  assert.equal(vocabLine(backend), "- `attention_backend` (str; one of 7 values (engine_vocab lists them)) [high]");
   assert.match(vocabLine(backend, true), /one of "a", "b", "c", "d", "e", "f", "g"/);
-  const mem = { kind: "flag" as const, name: "mem_fraction_static", type: "float", level: "mid", suggested: { range: { min: 0.75, max: 0.93, step: 0.02 } } };
-  assert.equal(vocabLine(mem), "- `mem_fraction_static` (float) [mid; try 0.75–0.93 (step 0.02)]");
   const spec = { kind: "flag" as const, name: "speculative_algorithm", type: "str", choices: ["EAGLE", "NGRAM"], choices_open: true };
   assert.match(vocabLine(spec), /one of "EAGLE", "NGRAM" or a registered plugin/);
+  const layout = { kind: "env" as const, name: "SGLANG_DEEPGEMM_STANDARD_LAYOUT", type: "str", default: "auto",
+    reads: [{ where: "srt/layers/moe/deep_gemm.py:179", code: 'mode = envs.SGLANG_DEEPGEMM_STANDARD_LAYOUT.get().lower()\nif mode not in ("auto", "masked", "compact"):' }] };
+  assert.doesNotMatch(vocabLine(layout), /read at/, "the record stays one line");
+  assert.match(vocabLine(layout, true), /read at srt\/layers\/moe\/deep_gemm.py:179:\n      mode = .*\n      if mode not in \("auto", "masked", "compact"\):/);
 });
 
 test("declared values no trial has tried are listed, failed trials count as tried", () => {

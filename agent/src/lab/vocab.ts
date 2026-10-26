@@ -15,17 +15,10 @@ export type VocabEntry = {
   help_source?: string;
   level?: string;
   when?: string;
-  /** The platform's hint of where to search: values worth a trial, or an interval. */
-  suggested?: { values?: unknown[]; range?: { min: number; max: number; step?: number } } | null;
+  /** For a string env var with no declared choices: the engine code that reads
+   *  it, its own check of the value first. The only list of values there is. */
+  reads?: { where: string; code: string }[];
 };
-
-/** "try 0.75–0.93 (step 0.02)" / "try fa3, flashinfer"; "" without a hint. */
-export function suggestionText(e: VocabEntry): string {
-  const s = e.suggested;
-  if (s?.range) return `try ${s.range.min}–${s.range.max}${s.range.step ? ` (step ${s.range.step})` : ""}`;
-  if (s?.values?.length) return `try ${s.values.map((v) => (typeof v === "string" ? v : JSON.stringify(v))).join(", ")}`;
-  return "";
-}
 
 /** The key a config sets it with: a flag's snake_case name, `env.NAME`. */
 export function configKeyOf(e: VocabEntry): string {
@@ -45,9 +38,12 @@ export function vocabLine(e: VocabEntry, full = false): string {
     : full || n <= 6
       ? `; one of ${e.choices!.map((c) => JSON.stringify(c)).join(", ")}${open}`
       : `; one of ${n} values${open} (engine_vocab lists them)`;
-  const tag = [e.level && e.level !== "unknown" ? e.level : "", e.when ? `when: ${e.when}` : "", suggestionText(e)].filter(Boolean).join("; ");
+  const tag = [e.level && e.level !== "unknown" ? e.level : "", e.when ? `when: ${e.when}` : ""].filter(Boolean).join("; ");
   const help = (e.help ?? "").trim();
   const said = full ? help : help.split(/(?<=\.)\s/)[0];
   const source = e.help_source === "source" ? " (from the engine's code)" : "";
-  return `- \`${configKeyOf(e)}\`${facts || choices ? ` (${facts}${choices})` : ""}${tag ? ` [${tag}]` : ""}${said ? ` — ${said}${source}` : ""}`;
+  const line = `- \`${configKeyOf(e)}\`${facts || choices ? ` (${facts}${choices})` : ""}${tag ? ` [${tag}]` : ""}${said ? ` — ${said}${source}` : ""}`;
+  if (!full || !e.reads?.length) return line;
+  const reads = e.reads.map((r) => `    read at ${r.where}:\n${r.code.split("\n").map((l) => `      ${l}`).join("\n")}`);
+  return [line, ...reads].join("\n");
 }
