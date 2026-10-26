@@ -11,9 +11,9 @@ import { buildTools, type ToolContext } from "../src/tools.js";
 import { FakePlatform } from "./fake-platform.js";
 
 test("an entry reads as the key a config sets, with its facts and recommendation", () => {
-  const env = { kind: "env" as const, name: "SGLANG_ENABLE_SPEC_V2", type: "bool", default: false, help: "Use the overlapped loop. Needs a speculative algorithm.", help_source: "docs", level: "high", when: "speculative decoding on" };
-  assert.equal(configKeyOf(env), "env.SGLANG_ENABLE_SPEC_V2");
-  assert.equal(vocabLine(env), "- `env.SGLANG_ENABLE_SPEC_V2` (bool, default false) [high; when: speculative decoding on] — Use the overlapped loop.");
+  const env = { kind: "env" as const, name: "SGLANG_ENABLE_OVERLAP_PLAN_STREAM", type: "bool", default: false, help: "Plan the next step on a separate stream. Needs a speculative algorithm.", help_source: "docs", level: "high", when: "speculative decoding on" };
+  assert.equal(configKeyOf(env), "env.SGLANG_ENABLE_OVERLAP_PLAN_STREAM");
+  assert.equal(vocabLine(env), "- `env.SGLANG_ENABLE_OVERLAP_PLAN_STREAM` (bool, default false) [high; when: speculative decoding on] — Plan the next step on a separate stream.");
   assert.match(vocabLine(env, true), /Needs a speculative algorithm\.$/);
   const flag = { kind: "flag" as const, name: "attention_backend", type: "str", choices: ["fa3", "triton"], help: "x = y", help_source: "source", level: "unknown" };
   assert.equal(vocabLine(flag), '- `attention_backend` (str; one of "fa3", "triton") — x = y (from the engine\'s code)');
@@ -48,11 +48,11 @@ test("engine_vocab looks switches up on the platform", async () => {
     const out = await tool.execute("t1", { query: "spec" });
     const body = (out.content[0] as { text: string }).text;
     assert.match(body, /1 match/);
-    assert.match(body, /`env\.SGLANG_ENABLE_SPEC_V2`.*\[high; when: speculative decoding on\]/);
+    assert.match(body, /`env\.SGLANG_ENABLE_OVERLAP_PLAN_STREAM`.*\[high; when: speculative decoding on\]/);
 
     const check = buildTools(ctx).find((t) => t.name === "check")!;
-    const checked = (await check.execute("t2", { engine_args: { tp: 2, "env.SGLANG_ENABLE_SPEC_V2": true } })).content[0] as { text: string };
-    assert.match(checked.text, /env: SGLANG_ENABLE_SPEC_V2=1/);
+    const checked = (await check.execute("t2", { engine_args: { tp: 2, "env.SGLANG_ENABLE_OVERLAP_PLAN_STREAM": true } })).content[0] as { text: string };
+    assert.match(checked.text, /env: SGLANG_ENABLE_OVERLAP_PLAN_STREAM=1/);
     const unknown = (await check.execute("t3", { engine_args: { "env.SGLANG_NOPE": 1 } })).content[0] as { text: string };
     assert.match(unknown.text, /problem \[unknown_env\]/);
 

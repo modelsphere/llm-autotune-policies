@@ -354,6 +354,9 @@ class Night {
   }
 
   private async trialDone(trial: Trial): Promise<void> {
+    // The platform reads the image's vocabulary in the background when the
+    // session starts; it may land after our first look.
+    if (this.vocabularyStatus === "none" && Date.now() - this.vocabularyReadAt > 5 * 60_000) await this.readVocabulary();
     await this.refreshContenders();
     await this.saveState("in progress");
     this.driver?.notify(this.describe(trial));
@@ -503,10 +506,12 @@ class Night {
 
   private levers: VocabEntry[] = [];
   private vocabularyStatus: string | undefined;
+  private vocabularyReadAt = 0;
 
   /** The image's recommended switches, once: the record lists them every turn. */
   private async readVocabulary(): Promise<void> {
     if (!this.manifest.services?.vocabulary) return;
+    this.vocabularyReadAt = Date.now();
     try {
       const vocab = await this.client.engineVocabulary({ level: "mid", limit: 60 });
       this.vocabularyStatus = vocab.status;

@@ -138,7 +138,7 @@ test("a whole night: anchor, hypotheses, refusals, a diagnosed failure, confirma
     assert.ok(record.includes("there are no levels"), "the record says what the screen sends");
     // The image's recommended switches are in the record, high ones described.
     assert.ok(record.includes("## Engine switches worth trying"), "the record lists recommended switches");
-    assert.ok(record.includes("`env.SGLANG_ENABLE_SPEC_V2` (bool, default false) [high; when: speculative decoding on]"));
+    assert.ok(record.includes("`env.SGLANG_ENABLE_OVERLAP_PLAN_STREAM` (bool, default false) [high; when: speculative decoding on]"));
     assert.ok(record.includes("- `chunked_prefill_size` (int) [mid]"), "mid switches in one line");
     assert.ok(!record.includes("SGLANG_LOG_GC"), "unknown ones stay out of the record");
 

@@ -56,7 +56,7 @@ export function replayMeasures(config: Config, value: number) {
 
 /** What the fake engine image reads (GET /engine/vocabulary). */
 export const VOCABULARY = [
-  { kind: "env", name: "SGLANG_ENABLE_SPEC_V2", type: "bool", default: false, choices: [], help: "Use the overlapped speculative decoding loop. Needs a speculative algorithm.", help_source: "docs", where: "", level: "high", when: "speculative decoding on" },
+  { kind: "env", name: "SGLANG_ENABLE_OVERLAP_PLAN_STREAM", type: "bool", default: false, choices: [], help: "Plan the next step on a separate stream to overlap with the current step. Needs a speculative algorithm.", help_source: "docs", where: "", level: "high", when: "speculative decoding on" },
   { kind: "flag", name: "chunked_prefill_size", type: "int", default: null, choices: [], help: "Tokens per prefill chunk.", help_source: "engine", where: "", level: "mid", when: "" },
   { kind: "env", name: "SGLANG_LOG_GC", type: "bool", default: false, choices: [], help: "Log garbage collection.", help_source: "docs", where: "", level: "unknown", when: "" },
 ];
