@@ -1007,6 +1007,10 @@ export interface components {
             extra_volumes?: {
                 [key: string]: unknown;
             };
+            /** Facts */
+            facts?: {
+                [key: string]: unknown;
+            };
             /** Image */
             image: string;
             /** Model Path */
@@ -1499,6 +1503,14 @@ export interface components {
              * @default
              */
             image: string;
+            /** Model Config Json */
+            model_config_json?: {
+                [key: string]: unknown;
+            };
+            /** Model Facts */
+            model_facts?: {
+                [key: string]: unknown;
+            };
             /** Notes */
             notes?: string[];
             /** Status */

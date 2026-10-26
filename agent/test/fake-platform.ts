@@ -246,7 +246,11 @@ export class FakePlatform {
         const entries = VOCABULARY.filter((e) => (!kind || e.kind === kind)
           && (!level || rank[e.level] <= rank[level])
           && (!query || e.name.toLowerCase().includes(query) || e.help.toLowerCase().includes(query)));
-        return send(200, { status: "ok", engine: "sglang", engine_version: "0.5.19", image: "sglang:test", total: entries.length, notes: [], entries });
+        return send(200, {
+          status: "ok", engine: "sglang", engine_version: "0.5.19", image: "sglang:test", total: entries.length, notes: [], entries,
+          model_facts: { architectures: ["Qwen3NextForCausalLM"], experts: 512, experts_per_token: 10, draft_layers: 1, kv_heads: 2 },
+          model_config_json: {},
+        });
       }
       if (req.method === "POST" && path === "/launches") {
         const check = this.check(body.engine_args ?? {});

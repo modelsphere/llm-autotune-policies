@@ -1253,6 +1253,11 @@
             "title": "Extra Volumes",
             "type": "object"
           },
+          "facts": {
+            "additionalProperties": true,
+            "title": "Facts",
+            "type": "object"
+          },
           "image": {
             "title": "Image",
             "type": "string"
@@ -2401,6 +2406,16 @@
             "default": "",
             "title": "Image",
             "type": "string"
+          },
+          "model_config_json": {
+            "additionalProperties": true,
+            "title": "Model Config Json",
+            "type": "object"
+          },
+          "model_facts": {
+            "additionalProperties": true,
+            "title": "Model Facts",
+            "type": "object"
           },
           "notes": {
             "items": {

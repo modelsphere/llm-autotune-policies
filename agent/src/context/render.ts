@@ -48,6 +48,31 @@ export interface RecordContext {
   levers?: VocabEntry[];
   /** "ok", "partial", "none", or undefined when the platform has no vocabulary service. */
   vocabularyStatus?: string;
+  /** How many flags and env vars the image reads. */
+  vocabularyCounts?: { flags: number; env: number; engineVersion: string };
+  /** The model's facts from its config.json (manifest, or a later vocabulary read). */
+  modelFacts?: Record<string, unknown>;
+}
+
+/** "MoE, 512 experts (10 active); built-in draft layers: 1; …" — the model's
+ *  facts in the words a tuner uses. Empty when none were read. */
+export function factsText(facts: Record<string, unknown> | undefined): string {
+  const f = facts ?? {};
+  if (!Object.keys(f).length) return "";
+  const parts: string[] = [];
+  if (Array.isArray(f.architectures)) parts.push(String(f.architectures.join("/")));
+  if (f.experts) parts.push(`MoE, ${f.experts} experts${f.experts_per_token ? ` (${f.experts_per_token} active per token)` : ""}${f.shared_experts ? `, ${f.shared_experts} shared` : ""}`);
+  else parts.push("dense");
+  parts.push(`built-in draft layers (MTP/NEXTN): ${f.draft_layers ?? "none"}`);
+  if (f.layer_types && typeof f.layer_types === "object") parts.push(`layers by kind: ${JSON.stringify(f.layer_types)}`);
+  if (f.kv_lora_rank) parts.push(`MLA attention (kv_lora_rank ${f.kv_lora_rank})`);
+  for (const [key, label] of [["layers", "layers"], ["kv_heads", "KV heads"], ["head_dim", "head dim"], ["max_context", "max context"], ["sliding_window", "sliding window"]] as const) {
+    if (f[key] !== undefined) parts.push(`${label} ${f[key]}`);
+  }
+  if (f.dtype) parts.push(`dtype ${f.dtype}`);
+  if (f.quantization) parts.push(`quantized: ${JSON.stringify(f.quantization)}`);
+  if (f.multimodal) parts.push("multimodal");
+  return parts.join("; ");
 }
 
 type DeclaredSpace = { grid?: Record<string, unknown[]>; tied?: Record<string, unknown[]>[] };
@@ -227,6 +252,8 @@ export function renderRecord(ctx: RecordContext): string {
 
   out.push("\n## Tonight");
   out.push(`- Model: ${manifest.model.served_model_name} on ${manifest.model.engine}, image ${manifest.model.image}`);
+  const facts = factsText(ctx.modelFacts ?? (manifest.model as { facts?: Record<string, unknown> }).facts);
+  out.push(facts ? `- What the model is (its config.json): ${facts}` : "- The model's config has not been read yet.");
   out.push(`- Hardware: ${hw.machine} — ${hw.gpu_type || "unknown GPU"}, ${ctx.totalCards} card(s)${hw.pool ? ` (a pool of ${hw.node_count} node(s), at most ${hw.node_gpu_max || "?"} cards per launch)` : ""}, ${hw.ports?.length ?? 0} port(s)`);
   out.push(...timeLines(manifest.time, b.minutesLeft, ctx.nowMs ?? Date.now()));
   out.push(`- One trial takes ~${fmt(b.perTrial, 0)} min (launch to release); up to ${b.parallel} at once → room for about ${b.trialsLeft ?? "?"} more trial(s)`);
@@ -265,13 +292,15 @@ export function renderRecord(ctx: RecordContext): string {
   out.push("- Use `check` before proposing anything unusual; it costs nothing.");
 
   if (ctx.vocabularyStatus !== undefined) {
-    out.push("\n## Engine switches worth trying");
+    out.push("\n## What this engine image accepts");
     const levers = ctx.levers ?? [];
+    const counts = ctx.vocabularyCounts;
     if (ctx.vocabularyStatus === "none") {
       out.push("- The platform has not read this image's flags and environment variables yet; rely on the flags you know.");
-    } else if (!levers.length) {
-      out.push("- No switch of this image is recommended for this hardware; `engine_vocab` lists everything it reads.");
     } else {
+      out.push(`- ${counts ? `${counts.flags} flag(s) and ${counts.env} environment variable(s)` : "Its flags and environment variables"}, read from the image${counts?.engineVersion ? ` (${manifest.model.engine} ${counts.engineVersion})` : ""}: types, defaults, allowed values and the engine's own description of each. Look up any you have not used tonight with \`engine_vocab\` before proposing it; a flag the image does not accept, or an env var it does not read, is refused.`);
+    }
+    if (levers.length) {
       out.push("Recommended by the platform for this engine image and hardware (`high` first). Try each `high` one early, alone against the anchor, where its `when` fits; `mid` ones when the evidence points at them. They are ideas, not results: measure them. Everything else the image reads: `engine_vocab`.");
       for (const e of levers.filter((x) => x.level === "high")) out.push(vocabLine(e));
       for (const e of levers.filter((x) => x.level === "mid")) out.push(vocabLine({ ...e, help: "" }));

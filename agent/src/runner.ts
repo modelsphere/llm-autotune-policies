@@ -41,6 +41,10 @@ export class TrialRunner {
   private readonly running = new Map<number, Promise<void>>();
   private stopped = false;
   private waitTimer: NodeJS.Timeout | null = null;
+  /** A trial the platform had no room for may start again after this time
+   *  (ms): without it, the finished attempt's pump restarted it at once, in a
+   *  loop that sent a launch every few milliseconds. */
+  private notBefore = new Map<number, number>();
   /** Idempotency keys are scoped to this process: a restarted container must
    *  not be handed the runs its predecessor asked for under the same key. */
   private readonly runId = randomBytes(4).toString("hex");
@@ -101,6 +105,7 @@ export class TrialRunner {
     if (this.stopped) return;
     for (const trial of this.lab.trials.filter((t) => t.status === "queued")) {
       if (!this.freePorts.length) break;
+      if ((this.notBefore.get(trial.id) ?? 0) > Date.now()) continue;
       const cards = this.hasCards ? trial.cards : 0;
       if (this.hasCards && this.freeCards.length < cards) continue;
       const gpus = this.hasCards ? this.freeCards.splice(0, cards) : [];
@@ -166,6 +171,8 @@ export class TrialRunner {
           trial.status = "queued";
           trial.startedAt = undefined;
           requeued = true;
+          this.notBefore.set(trial.id, Date.now() + this.opts.pollMs);
+          if (this.waitTimer) clearTimeout(this.waitTimer);
           this.waitTimer = setTimeout(() => this.pump(), this.opts.pollMs);
           return;
         }
