@@ -9,11 +9,23 @@ export type VocabEntry = {
   type?: string;
   default?: unknown;
   choices?: unknown[];
+  /** The engine accepts names beyond `choices` too (a plugin registry). */
+  choices_open?: boolean;
   help?: string;
   help_source?: string;
   level?: string;
   when?: string;
+  /** The platform's hint of where to search: values worth a trial, or an interval. */
+  suggested?: { values?: unknown[]; range?: { min: number; max: number; step?: number } } | null;
 };
+
+/** "try 0.75–0.93 (step 0.02)" / "try fa3, flashinfer"; "" without a hint. */
+export function suggestionText(e: VocabEntry): string {
+  const s = e.suggested;
+  if (s?.range) return `try ${s.range.min}–${s.range.max}${s.range.step ? ` (step ${s.range.step})` : ""}`;
+  if (s?.values?.length) return `try ${s.values.map((v) => (typeof v === "string" ? v : JSON.stringify(v))).join(", ")}`;
+  return "";
+}
 
 /** The key a config sets it with: a flag's snake_case name, `env.NAME`. */
 export function configKeyOf(e: VocabEntry): string {
@@ -26,8 +38,14 @@ export function vocabLine(e: VocabEntry, full = false): string {
   const facts = [e.type, e.default !== undefined && e.default !== null ? `default ${JSON.stringify(e.default)}` : ""]
     .filter(Boolean)
     .join(", ");
-  const choices = e.choices?.length ? `; one of ${e.choices.map((c) => JSON.stringify(c)).join(", ")}` : "";
-  const tag = [e.level && e.level !== "unknown" ? e.level : "", e.when ? `when: ${e.when}` : ""].filter(Boolean).join("; ");
+  const open = e.choices_open ? " or a registered plugin" : "";
+  const n = e.choices?.length ?? 0;
+  const choices = !n
+    ? ""
+    : full || n <= 6
+      ? `; one of ${e.choices!.map((c) => JSON.stringify(c)).join(", ")}${open}`
+      : `; one of ${n} values${open} (engine_vocab lists them)`;
+  const tag = [e.level && e.level !== "unknown" ? e.level : "", e.when ? `when: ${e.when}` : "", suggestionText(e)].filter(Boolean).join("; ");
   const help = (e.help ?? "").trim();
   const said = full ? help : help.split(/(?<=\.)\s/)[0];
   const source = e.help_source === "source" ? " (from the engine's code)" : "";

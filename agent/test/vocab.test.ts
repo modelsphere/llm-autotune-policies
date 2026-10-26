@@ -19,6 +19,16 @@ test("an entry reads as the key a config sets, with its facts and recommendation
   assert.equal(vocabLine(flag), '- `attention_backend` (str; one of "fa3", "triton") — x = y (from the engine\'s code)');
 });
 
+test("the platform's search hint and long choice lists read briefly in the record", () => {
+  const backend = { kind: "flag" as const, name: "attention_backend", type: "str", choices: ["a", "b", "c", "d", "e", "f", "g"], level: "high", suggested: { values: ["fa3", "flashinfer"] } };
+  assert.equal(vocabLine(backend), '- `attention_backend` (str; one of 7 values (engine_vocab lists them)) [high; try fa3, flashinfer]');
+  assert.match(vocabLine(backend, true), /one of "a", "b", "c", "d", "e", "f", "g"/);
+  const mem = { kind: "flag" as const, name: "mem_fraction_static", type: "float", level: "mid", suggested: { range: { min: 0.75, max: 0.93, step: 0.02 } } };
+  assert.equal(vocabLine(mem), "- `mem_fraction_static` (float) [mid; try 0.75–0.93 (step 0.02)]");
+  const spec = { kind: "flag" as const, name: "speculative_algorithm", type: "str", choices: ["EAGLE", "NGRAM"], choices_open: true };
+  assert.match(vocabLine(spec), /one of "EAGLE", "NGRAM" or a registered plugin/);
+});
+
 test("declared values no trial has tried are listed, failed trials count as tried", () => {
   const lab = new LabState();
   lab.addTrial({ purpose: "explore", config: { tp: 2, attention_backend: "fa3" }, cards: 2 });
