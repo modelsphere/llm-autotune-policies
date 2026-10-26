@@ -19,8 +19,9 @@ export type ContenderOut = Schemas["ContenderOut"];
 export type ContendersEcho = Schemas["ContendersEcho"];
 export type PlanExtra = Schemas["PlanExtra"];
 export type TrialOut = Schemas["TrialOut"];
+export type VocabularyOut = Schemas["VocabularyOut"];
 
 /** A flat dict of engine args in the platform's canonical spelling. */
 export type Config = Record<string, unknown>;
 
-export const CONTRACT_VERSION = "1.4";
+export const CONTRACT_VERSION = "1.5";

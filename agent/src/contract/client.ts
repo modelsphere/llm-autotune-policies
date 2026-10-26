@@ -20,6 +20,7 @@ import type {
   PlanExtra,
   ResultsPart,
   TrialOut,
+  VocabularyOut,
 } from "./types.js";
 
 export class PolicyError extends Error {
@@ -196,6 +197,14 @@ export class PolicyClient {
   // -- configs, contenders, state, events -----------------------------------------
   checkConfig(engineArgs: Config): Promise<ConfigCheckOut> {
     return this.request("POST", "/configs/check", { engine_args: engineArgs });
+  }
+  /** The flags and env vars the engine image reads, best recommendation
+   *  first (1.5). */
+  engineVocabulary(filter: { kind?: string; query?: string; level?: string; limit?: number } = {}): Promise<VocabularyOut> {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(filter)) if (v !== undefined && v !== "") params.set(k, String(v));
+    const qs = params.toString();
+    return this.request("GET", `/engine/vocabulary${qs ? `?${qs}` : ""}`);
   }
   putContenders(contenders: ContenderIn[]): Promise<ContendersEcho> {
     return this.request("PUT", "/contenders", { contenders });

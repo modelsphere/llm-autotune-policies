@@ -7,6 +7,7 @@
 import type { Manifest } from "../contract/types.js";
 import type { Hypothesis, LabState, Trial } from "../lab/state.js";
 import { configText, diffText } from "../lab/space.js";
+import { type VocabEntry, vocabLine } from "../lab/vocab.js";
 import {
   type Catalogue,
   catalogueOf,
@@ -43,6 +44,29 @@ export interface RecordContext {
   nowMs?: number;
   tokensUsed?: number;
   tokenLimit?: number;
+  /** The image's high and mid recommendations, read once at the start (1.5). */
+  levers?: VocabEntry[];
+  /** "ok", "partial", "none", or undefined when the platform has no vocabulary service. */
+  vocabularyStatus?: string;
+}
+
+type DeclaredSpace = { grid?: Record<string, unknown[]>; tied?: Record<string, unknown[]>[] };
+
+/** Declared grid/tied values that no trial tonight has set (failed ones count
+ *  as tried): "tp: 4; attention_backend: fa3". */
+export function untriedDeclared(space: unknown, trials: Trial[]): string[] {
+  const s = (space ?? {}) as DeclaredSpace;
+  const values = new Map<string, unknown[]>();
+  for (const [k, vs] of Object.entries(s.grid ?? {})) values.set(k, [...(values.get(k) ?? []), ...(vs ?? [])]);
+  for (const group of s.tied ?? []) for (const [k, vs] of Object.entries(group)) values.set(k, [...(values.get(k) ?? []), ...(vs ?? [])]);
+  const show = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
+  const out: string[] = [];
+  for (const [key, vs] of [...values.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    const tried = new Set(trials.filter((t) => key in t.config).map((t) => show(t.config[key])));
+    const left = [...new Set(vs.map(show))].filter((v) => !tried.has(v));
+    if (left.length) out.push(`${key}: ${left.join(", ")}`);
+  }
+  return out;
 }
 
 function minutesBetween(a?: string, b?: string): number | null {
@@ -237,14 +261,33 @@ export function renderRecord(ctx: RecordContext): string {
   out.push("\n## Rules the platform enforces");
   out.push(`- Forbidden parameters (keep the campaign's value; never change): ${ctx.forbidden.length ? ctx.forbidden.join(", ") : "none"}`);
   out.push("- Every value must be a string, number or boolean that survives the engine command line and back (no lists/objects; JSON flags as one JSON string). Never set placement (model_path, host, port, …).");
+  if (manifest.services?.env_keys) out.push("- An environment variable is set as an `env.NAME` key (`\"env.SGLANG_FOO\": true`). A name the image does not read is refused: look it up with `engine_vocab` first.");
   out.push("- Use `check` before proposing anything unusual; it costs nothing.");
+
+  if (ctx.vocabularyStatus !== undefined) {
+    out.push("\n## Engine switches worth trying");
+    const levers = ctx.levers ?? [];
+    if (ctx.vocabularyStatus === "none") {
+      out.push("- The platform has not read this image's flags and environment variables yet; rely on the flags you know.");
+    } else if (!levers.length) {
+      out.push("- No switch of this image is recommended for this hardware; `engine_vocab` lists everything it reads.");
+    } else {
+      out.push("Recommended by the platform for this engine image and hardware (`high` first). Try each `high` one early, alone against the anchor, where its `when` fits; `mid` ones when the evidence points at them. They are ideas, not results: measure them. Everything else the image reads: `engine_vocab`.");
+      for (const e of levers.filter((x) => x.level === "high")) out.push(vocabLine(e));
+      for (const e of levers.filter((x) => x.level === "mid")) out.push(vocabLine({ ...e, help: "" }));
+    }
+  }
 
   out.push("\n## Production (the anchor)");
   const production = (manifest.production as { engine_args?: Record<string, unknown> } | undefined)?.engine_args;
   out.push(`- Production config: ${production && Object.keys(production).length ? configText(production) : "(none recorded; the anchor is the campaign's base config)"}`);
   out.push(`- Anchor measurement: ${anchor ? (anchorValue !== null ? fmt(anchorValue) : anchor.status) : "not started"}`);
   const declared = manifest.search_space ?? {};
-  if (Object.keys(declared).length) out.push(`- The campaign's declared space (a hint, not a limit): ${JSON.stringify(declared)}`);
+  if (Object.keys(declared).length) {
+    out.push(`- The campaign's declared space (a hint, not a limit): ${JSON.stringify(declared)}`);
+    const untried = untriedDeclared(declared, lab.trials);
+    if (untried.length) out.push(`- Declared values no trial has tried yet: ${untried.join("; ")}`);
+  }
 
   out.push(`\n## Trials tonight (${lab.trials.length})`);
   if (noise !== null) out.push(`Measurement noise so far: ±${(noise * 100).toFixed(1)}% (half the spread of repeated measurements of the same config).`);

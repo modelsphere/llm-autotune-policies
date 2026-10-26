@@ -54,6 +54,13 @@ export function replayMeasures(config: Config, value: number) {
   }];
 }
 
+/** What the fake engine image reads (GET /engine/vocabulary). */
+export const VOCABULARY = [
+  { kind: "env", name: "SGLANG_ENABLE_SPEC_V2", type: "bool", default: false, choices: [], help: "Use the overlapped speculative decoding loop. Needs a speculative algorithm.", help_source: "docs", where: "", level: "high", when: "speculative decoding on" },
+  { kind: "flag", name: "chunked_prefill_size", type: "int", default: null, choices: [], help: "Tokens per prefill chunk.", help_source: "engine", where: "", level: "mid", when: "" },
+  { kind: "env", name: "SGLANG_LOG_GC", type: "bool", default: false, choices: [], help: "Log garbage collection.", help_source: "docs", where: "", level: "unknown", when: "" },
+];
+
 export class FakePlatform {
   readonly heartbeats: Record<string, unknown>[] = [];
   readonly events: { level: string; message: string }[] = [];
@@ -102,7 +109,15 @@ export class FakePlatform {
   private check(config: Config) {
     const problems: { kind: string; param: string; message: string }[] = [];
     const canonical = this.canonical(config);
+    const env: Record<string, string> = {};
+    const knownEnv = new Set(VOCABULARY.filter((e) => e.kind === "env").map((e) => e.name));
     for (const [key, value] of Object.entries(canonical)) {
+      if (key.startsWith("env.")) {
+        const name = key.slice(4);
+        if (!knownEnv.has(name)) problems.push({ kind: "unknown_env", param: key, message: `${name} is not an environment variable this sglang image reads` });
+        env[name] = typeof value === "boolean" ? (value ? "1" : "0") : String(value);
+        continue;
+      }
       if (["port", "host", "model_path"].includes(key)) problems.push({ kind: "placement", param: key, message: `${key} is placement` });
       if ((this.opts.forbidden ?? ["quantization*"]).some((p) => new RegExp(`^${p.replace("*", ".*")}$`).test(key))) {
         problems.push({ kind: "forbidden", param: key, message: `${key} is forbidden for this campaign` });
@@ -116,7 +131,8 @@ export class FakePlatform {
       ok: problems.length === 0,
       config: canonical,
       cards,
-      command: Object.entries(canonical).flatMap(([k, v]) => [`--${k.replaceAll("_", "-")}`, String(v)]),
+      command: Object.entries(canonical).filter(([k]) => !k.startsWith("env.")).flatMap(([k, v]) => [`--${k.replaceAll("_", "-")}`, String(v)]),
+      env,
       problems,
       warnings: [],
       deviations: Object.keys(canonical).filter((k) => !declared.has(k)).map((param) => ({ param, kind: "unknown", value: canonical[param] })),
@@ -127,7 +143,7 @@ export class FakePlatform {
     const now = Date.now();
     const cards = this.opts.cards ?? 4;
     return {
-      contract: { version: "1.4" },
+      contract: { version: "1.5" },
       session_id: this.opts.sessionId ?? 7,
       campaign_id: 3,
       policy: { name: "agent", image: "agent:test", version: "0.1.0", params: this.opts.params ?? {} },
@@ -163,6 +179,8 @@ export class FakePlatform {
         state: true,
         diagnostics: true,
         history: true,
+        env_keys: true,
+        vocabulary: true,
       },
       prior: { contenders: [] },
       measures: CATALOGUE,
@@ -220,6 +238,16 @@ export class FakePlatform {
         return send(204, "");
       }
       if (req.method === "POST" && path === "/configs/check") return send(200, this.check(body.engine_args ?? {}));
+      if (req.method === "GET" && path === "/engine/vocabulary") {
+        const rank: Record<string, number> = { high: 0, mid: 1, low: 2, unknown: 3 };
+        const level = url.searchParams.get("level") ?? "";
+        const query = (url.searchParams.get("query") ?? "").toLowerCase();
+        const kind = url.searchParams.get("kind") ?? "";
+        const entries = VOCABULARY.filter((e) => (!kind || e.kind === kind)
+          && (!level || rank[e.level] <= rank[level])
+          && (!query || e.name.toLowerCase().includes(query) || e.help.toLowerCase().includes(query)));
+        return send(200, { status: "ok", engine: "sglang", engine_version: "0.5.19", image: "sglang:test", total: entries.length, notes: [], entries });
+      }
       if (req.method === "POST" && path === "/launches") {
         const check = this.check(body.engine_args ?? {});
         if (!check.ok) return send(422, { detail: check.problems.map((p) => p.message).join("; ") });

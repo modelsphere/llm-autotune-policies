@@ -13,6 +13,7 @@ import { configText, diffText } from "./lab/space.js";
 import { byConfig, deltaText, type Direction, noiseBand, trialObjective } from "./lab/stats.js";
 import { catalogueOf, deltas } from "./lab/measures.js";
 import type { TrialRunner } from "./runner.js";
+import { type VocabEntry, vocabLine } from "./lab/vocab.js";
 
 export interface ToolContext {
   client: PolicyClient;
@@ -100,7 +101,7 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
       configs: Type.Array(
         Type.Object({
           engine_args: Type.Record(Type.String(), Type.Any(), {
-            description: "The COMPLETE config: flat dict of engine args, canonical snake_case keys, scalar values. Anything not set takes the campaign base / engine default.",
+            description: "The COMPLETE config: flat dict of engine args, canonical snake_case keys, scalar values; an environment variable as an `env.NAME` key. Anything not set takes the campaign base / engine default.",
           }),
           rationale: Type.Optional(Type.String()),
         }),
@@ -175,10 +176,34 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
         `cards: ${result.cards}`,
         `command: ${(result.command ?? []).join(" ")}`,
       ];
+      const env = Object.entries(result.env ?? {});
+      if (env.length) lines.push(`env: ${env.map(([k, v]) => `${k}=${v}`).join(" ")}`);
       for (const p of result.problems ?? []) lines.push(`problem [${p.kind}]: ${p.message}`);
       for (const w of result.warnings ?? []) lines.push(`warning: ${w}`);
       if (result.ok) lines.push("refusals: none — this config may be proposed");
       for (const d of result.deviations ?? []) lines.push(`note (allowed, not a refusal): ${deviationText(d)}`);
+      return text(lines.join("\n"));
+    },
+  });
+
+  const engineVocab = tool({
+    name: "engine_vocab",
+    label: "Engine vocabulary",
+    description:
+      "Look up the flags and environment variables this engine image reads: type, default, choices, what it does (the engine's own words), and the platform's recommendation (high, mid, low, unknown). Search by a substring of the name or description. Use it before setting a switch you have not used tonight; an env var the image does not read is refused.",
+    parameters: Type.Object({
+      query: Type.Optional(Type.String({ description: "Substring of the name or description, e.g. \"spec\" or \"allreduce\"" })),
+      kind: Type.Optional(Type.Union([Type.Literal("flag"), Type.Literal("env")])),
+      level: Type.Optional(Type.Union([Type.Literal("high"), Type.Literal("mid"), Type.Literal("low"), Type.Literal("unknown")], {
+        description: "Lowest recommendation to include (mid = high and mid)",
+      })),
+    }),
+    execute: async (params) => {
+      const vocab = await client.engineVocabulary({ ...params, limit: 40 });
+      if (vocab.status === "none") return text(`The platform has not read this image's vocabulary yet.${vocab.notes?.length ? ` ${vocab.notes.join("; ")}` : ""}`);
+      const lines = [`${vocab.engine} ${vocab.engine_version || ""}: ${vocab.total} match(es)${(vocab.total ?? 0) > (vocab.entries?.length ?? 0) ? `, showing ${vocab.entries?.length}` : ""}`];
+      for (const e of (vocab.entries ?? []) as VocabEntry[]) lines.push(vocabLine(e, true));
+      if (vocab.notes?.length) lines.push(`notes: ${vocab.notes.join("; ")}`);
       return text(lines.join("\n"));
     },
   });
@@ -349,5 +374,6 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
     },
   });
 
-  return [propose, check, inspectTrial, readLog, compare, remeasure, cancelTrial, openHypothesis, closeHypothesis, addConstraint, recordLesson, done];
+  const vocab = ctx.manifest.services?.vocabulary ? [engineVocab] : [];
+  return [propose, check, ...vocab, inspectTrial, readLog, compare, remeasure, cancelTrial, openHypothesis, closeHypothesis, addConstraint, recordLesson, done];
 }

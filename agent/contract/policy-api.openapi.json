@@ -185,6 +185,13 @@
             "title": "Deviations",
             "type": "array"
           },
+          "env": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Env",
+            "type": "object"
+          },
           "ok": {
             "title": "Ok",
             "type": "boolean"
@@ -1010,6 +1017,11 @@
             "title": "Is Production",
             "type": "boolean"
           },
+          "same_as_production": {
+            "default": false,
+            "title": "Same As Production",
+            "type": "boolean"
+          },
           "value": {
             "anyOf": [
               {
@@ -1303,6 +1315,11 @@
             "title": "Diagnostics",
             "type": "boolean"
           },
+          "env_keys": {
+            "default": false,
+            "title": "Env Keys",
+            "type": "boolean"
+          },
           "history": {
             "default": false,
             "title": "History",
@@ -1316,6 +1333,11 @@
           "state": {
             "default": true,
             "title": "State",
+            "type": "boolean"
+          },
+          "vocabulary": {
+            "default": false,
+            "title": "Vocabulary",
             "type": "boolean"
           }
         },
@@ -2355,6 +2377,55 @@
         "title": "VerdictOut",
         "type": "object"
       },
+      "VocabularyOut": {
+        "description": "The flags and environment variables the campaign's engine image reads\n(1.5), best recommendation first.\n\n`status` is \"ok\", \"partial\" (some of it could not be read; `notes` says\nwhat), or \"none\" (nothing has been dumped from this image yet). Each entry:\n{kind: flag|env, name, type, default, choices, help, help_source, where,\nlevel: high|mid|low|unknown, when}. `level` is the platform's hand-written\nrecommendation, `when` the situation it helps in; an entry labeled only for\nother hardware is left out.",
+        "properties": {
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
+          "engine_version": {
+            "default": "",
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "entries": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "image": {
+            "default": "",
+            "title": "Image",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "engine"
+        ],
+        "title": "VocabularyOut",
+        "type": "object"
+      },
       "app__schemas__agent__MachineOut": {
         "properties": {
           "driver": {
@@ -2813,6 +2884,90 @@
           }
         ],
         "summary": "Contender Serving",
+        "tags": [
+          "policy sessions"
+        ]
+      }
+    },
+    "/api/policy/v1/engine/vocabulary": {
+      "get": {
+        "description": "What the campaign's engine image reads, filtered: `kind`, a substring\nof the name or help (`query`), and the lowest `level` wanted (\"mid\" =\nhigh and mid).",
+        "operationId": "engine_vocabulary_api_policy_v1_engine_vocabulary_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "default": "",
+              "pattern": "^(|flag|env)$",
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "query",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Query",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "default": "",
+              "pattern": "^(|high|mid|low|unknown)$",
+              "title": "Level",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabularyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Engine Vocabulary",
         "tags": [
           "policy sessions"
         ]
