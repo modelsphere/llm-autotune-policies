@@ -138,6 +138,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/policy/v1/engine/vocabulary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Engine Vocabulary
+         * @description What the campaign's engine image reads, filtered: `kind`, a substring
+         *     of the name or help (`query`), and the lowest `level` wanted ("mid" =
+         *     high and mid).
+         */
+        get: operations["engine_vocabulary_api_policy_v1_engine_vocabulary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/policy/v1/events": {
         parameters: {
             query?: never;
@@ -502,6 +524,10 @@ export interface components {
             deviations?: {
                 [key: string]: unknown;
             }[];
+            /** Env */
+            env?: {
+                [key: string]: string;
+            };
             /** Ok */
             ok: boolean;
             /** Problems */
@@ -852,6 +878,11 @@ export interface components {
              * @default false
              */
             is_production: boolean;
+            /**
+             * Same As Production
+             * @default false
+             */
+            same_as_production: boolean;
             /** Value */
             value?: number | null;
             /** Vs Production */
@@ -976,6 +1007,10 @@ export interface components {
             extra_volumes?: {
                 [key: string]: unknown;
             };
+            /** Facts */
+            facts?: {
+                [key: string]: unknown;
+            };
             /** Image */
             image: string;
             /** Model Path */
@@ -1006,6 +1041,11 @@ export interface components {
              */
             diagnostics: boolean;
             /**
+             * Env Keys
+             * @default false
+             */
+            env_keys: boolean;
+            /**
              * History
              * @default false
              */
@@ -1020,6 +1060,11 @@ export interface components {
              * @default true
              */
             state: boolean;
+            /**
+             * Vocabulary
+             * @default false
+             */
+            vocabulary: boolean;
         };
         /** ManifestTime */
         ManifestTime: {
@@ -1429,6 +1474,53 @@ export interface components {
             /** Role */
             role: string;
         };
+        /**
+         * VocabularyOut
+         * @description The flags and environment variables the campaign's engine image reads
+         *     (1.5), best recommendation first.
+         *
+         *     `status` is "ok", "partial" (some of it could not be read; `notes` says
+         *     what), or "none" (nothing has been dumped from this image yet). Each entry:
+         *     {kind: flag|env, name, type, default, choices, help, help_source, where,
+         *     level: high|mid|low|unknown, when}. `level` is the platform's hand-written
+         *     recommendation, `when` the situation it helps in; an entry labeled only for
+         *     other hardware is left out.
+         */
+        VocabularyOut: {
+            /** Engine */
+            engine: string;
+            /**
+             * Engine Version
+             * @default
+             */
+            engine_version: string;
+            /** Entries */
+            entries?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Image
+             * @default
+             */
+            image: string;
+            /** Model Config Json */
+            model_config_json?: {
+                [key: string]: unknown;
+            };
+            /** Model Facts */
+            model_facts?: {
+                [key: string]: unknown;
+            };
+            /** Notes */
+            notes?: string[];
+            /** Status */
+            status: string;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
         /** MachineOut */
         app__schemas__agent__MachineOut: {
             /**
@@ -1728,6 +1820,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContenderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    engine_vocabulary_api_policy_v1_engine_vocabulary_get: {
+        parameters: {
+            query?: {
+                kind?: string;
+                query?: string;
+                level?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VocabularyOut"];
                 };
             };
             /** @description Validation Error */

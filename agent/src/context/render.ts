@@ -7,6 +7,7 @@
 import type { Manifest } from "../contract/types.js";
 import type { Hypothesis, LabState, Trial } from "../lab/state.js";
 import { configText, diffText } from "../lab/space.js";
+import { type VocabEntry, vocabLine } from "../lab/vocab.js";
 import {
   type Catalogue,
   catalogueOf,
@@ -43,6 +44,54 @@ export interface RecordContext {
   nowMs?: number;
   tokensUsed?: number;
   tokenLimit?: number;
+  /** The image's high and mid recommendations, read once at the start (1.5). */
+  levers?: VocabEntry[];
+  /** "ok", "partial", "none", or undefined when the platform has no vocabulary service. */
+  vocabularyStatus?: string;
+  /** How many flags and env vars the image reads. */
+  vocabularyCounts?: { flags: number; env: number; engineVersion: string };
+  /** The model's facts from its config.json (manifest, or a later vocabulary read). */
+  modelFacts?: Record<string, unknown>;
+}
+
+/** "MoE, 512 experts (10 active); built-in draft layers: 1; …" — the model's
+ *  facts in the words a tuner uses. Empty when none were read. */
+export function factsText(facts: Record<string, unknown> | undefined): string {
+  const f = facts ?? {};
+  if (!Object.keys(f).length) return "";
+  const parts: string[] = [];
+  if (Array.isArray(f.architectures)) parts.push(String(f.architectures.join("/")));
+  if (f.experts) parts.push(`MoE, ${f.experts} experts${f.experts_per_token ? ` (${f.experts_per_token} active per token)` : ""}${f.shared_experts ? `, ${f.shared_experts} shared` : ""}`);
+  else parts.push("dense");
+  parts.push(`built-in draft layers (MTP/NEXTN): ${f.draft_layers ?? "none"}`);
+  if (f.layer_types && typeof f.layer_types === "object") parts.push(`layers by kind: ${JSON.stringify(f.layer_types)}`);
+  if (f.kv_lora_rank) parts.push(`MLA attention (kv_lora_rank ${f.kv_lora_rank})`);
+  for (const [key, label] of [["layers", "layers"], ["kv_heads", "KV heads"], ["head_dim", "head dim"], ["max_context", "max context"], ["sliding_window", "sliding window"]] as const) {
+    if (f[key] !== undefined) parts.push(`${label} ${f[key]}`);
+  }
+  if (f.dtype) parts.push(`dtype ${f.dtype}`);
+  if (f.quantization) parts.push(`quantized: ${JSON.stringify(f.quantization)}`);
+  if (f.multimodal) parts.push("multimodal");
+  return parts.join("; ");
+}
+
+type DeclaredSpace = { grid?: Record<string, unknown[]>; tied?: Record<string, unknown[]>[] };
+
+/** Declared grid/tied values that no trial tonight has set (failed ones count
+ *  as tried): "tp: 4; attention_backend: fa3". */
+export function untriedDeclared(space: unknown, trials: Trial[]): string[] {
+  const s = (space ?? {}) as DeclaredSpace;
+  const values = new Map<string, unknown[]>();
+  for (const [k, vs] of Object.entries(s.grid ?? {})) values.set(k, [...(values.get(k) ?? []), ...(vs ?? [])]);
+  for (const group of s.tied ?? []) for (const [k, vs] of Object.entries(group)) values.set(k, [...(values.get(k) ?? []), ...(vs ?? [])]);
+  const show = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v));
+  const out: string[] = [];
+  for (const [key, vs] of [...values.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    const tried = new Set(trials.filter((t) => key in t.config).map((t) => show(t.config[key])));
+    const left = [...new Set(vs.map(show))].filter((v) => !tried.has(v));
+    if (left.length) out.push(`${key}: ${left.join(", ")}`);
+  }
+  return out;
 }
 
 function minutesBetween(a?: string, b?: string): number | null {
@@ -203,6 +252,8 @@ export function renderRecord(ctx: RecordContext): string {
 
   out.push("\n## Tonight");
   out.push(`- Model: ${manifest.model.served_model_name} on ${manifest.model.engine}, image ${manifest.model.image}`);
+  const facts = factsText(ctx.modelFacts ?? (manifest.model as { facts?: Record<string, unknown> }).facts);
+  out.push(facts ? `- What the model is (its config.json): ${facts}` : "- The model's config has not been read yet.");
   out.push(`- Hardware: ${hw.machine} — ${hw.gpu_type || "unknown GPU"}, ${ctx.totalCards} card(s)${hw.pool ? ` (a pool of ${hw.node_count} node(s), at most ${hw.node_gpu_max || "?"} cards per launch)` : ""}, ${hw.ports?.length ?? 0} port(s)`);
   out.push(...timeLines(manifest.time, b.minutesLeft, ctx.nowMs ?? Date.now()));
   out.push(`- One trial takes ~${fmt(b.perTrial, 0)} min (launch to release); up to ${b.parallel} at once → room for about ${b.trialsLeft ?? "?"} more trial(s)`);
@@ -237,14 +288,35 @@ export function renderRecord(ctx: RecordContext): string {
   out.push("\n## Rules the platform enforces");
   out.push(`- Forbidden parameters (keep the campaign's value; never change): ${ctx.forbidden.length ? ctx.forbidden.join(", ") : "none"}`);
   out.push("- Every value must be a string, number or boolean that survives the engine command line and back (no lists/objects; JSON flags as one JSON string). Never set placement (model_path, host, port, …).");
+  if (manifest.services?.env_keys) out.push("- An environment variable is set as an `env.NAME` key (`\"env.SGLANG_FOO\": true`). A name the image does not read is refused: look it up with `engine_vocab` first.");
   out.push("- Use `check` before proposing anything unusual; it costs nothing.");
+
+  if (ctx.vocabularyStatus !== undefined) {
+    out.push("\n## What this engine image accepts");
+    const levers = ctx.levers ?? [];
+    const counts = ctx.vocabularyCounts;
+    if (ctx.vocabularyStatus === "none") {
+      out.push("- The platform has not read this image's flags and environment variables yet; rely on the flags you know.");
+    } else {
+      out.push(`- ${counts ? `${counts.flags} flag(s) and ${counts.env} environment variable(s)` : "Its flags and environment variables"}, read from the image${counts?.engineVersion ? ` (${manifest.model.engine} ${counts.engineVersion})` : ""}: types, defaults, allowed values and the engine's own description of each. Look up any you have not used tonight with \`engine_vocab\` before proposing it; a flag the image does not accept, or an env var it does not read, is refused.`);
+    }
+    if (levers.length) {
+      out.push("Recommended by the platform for this engine image and hardware (`high` first). Try each `high` one early, alone against the anchor, where its `when` fits; `mid` ones when the evidence points at them. They are ideas, not results: measure them. Everything else the image reads: `engine_vocab`.");
+      for (const e of levers.filter((x) => x.level === "high")) out.push(vocabLine(e));
+      for (const e of levers.filter((x) => x.level === "mid")) out.push(vocabLine({ ...e, help: "" }));
+    }
+  }
 
   out.push("\n## Production (the anchor)");
   const production = (manifest.production as { engine_args?: Record<string, unknown> } | undefined)?.engine_args;
   out.push(`- Production config: ${production && Object.keys(production).length ? configText(production) : "(none recorded; the anchor is the campaign's base config)"}`);
   out.push(`- Anchor measurement: ${anchor ? (anchorValue !== null ? fmt(anchorValue) : anchor.status) : "not started"}`);
   const declared = manifest.search_space ?? {};
-  if (Object.keys(declared).length) out.push(`- The campaign's declared space (a hint, not a limit): ${JSON.stringify(declared)}`);
+  if (Object.keys(declared).length) {
+    out.push(`- The campaign's declared space (a hint, not a limit): ${JSON.stringify(declared)}`);
+    const untried = untriedDeclared(declared, lab.trials);
+    if (untried.length) out.push(`- Declared values no trial has tried yet: ${untried.join("; ")}`);
+  }
 
   out.push(`\n## Trials tonight (${lab.trials.length})`);
   if (noise !== null) out.push(`Measurement noise so far: ±${(noise * 100).toFixed(1)}% (half the spread of repeated measurements of the same config).`);

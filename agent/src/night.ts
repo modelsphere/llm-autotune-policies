@@ -15,6 +15,7 @@ import { PhaseError, PolicyClient, PolicyError } from "./contract/client.js";
 import { Heartbeat } from "./contract/heartbeat.js";
 import type { Config, ContenderIn, Manifest, PlanExtra } from "./contract/types.js";
 import { budget, type RecordContext, renderRecord } from "./context/render.js";
+import type { VocabEntry } from "./lab/vocab.js";
 import { AgentDriver } from "./driver.js";
 import { buildModel, diagnose, writeDigest } from "./llm.js";
 import { applyMemory, loadMemory, snapshot } from "./memory.js";
@@ -138,6 +139,7 @@ class Night {
     hb.start();
 
     await this.queueAnchor();
+    await this.readVocabulary();
 
     const tools = buildTools({
       client,
@@ -352,6 +354,11 @@ class Night {
   }
 
   private async trialDone(trial: Trial): Promise<void> {
+    // The platform reads the image's vocabulary in the background when the
+    // session starts; it may land after our first look.
+    const facts = this.modelFacts ?? (this.manifest.model as { facts?: object }).facts ?? {};
+    const stale = this.vocabularyStatus === "none" || !Object.keys(facts).length;
+    if (stale && Date.now() - this.vocabularyReadAt > 5 * 60_000) await this.readVocabulary();
     await this.refreshContenders();
     await this.saveState("in progress");
     this.driver?.notify(this.describe(trial));
@@ -499,6 +506,35 @@ class Night {
     if (start && end && end > start) this.hb.current.progress = (Date.now() - start) / (end - start);
   }
 
+  private levers: VocabEntry[] = [];
+  private vocabularyStatus: string | undefined;
+  private vocabularyReadAt = 0;
+  private vocabularyCounts: RecordContext["vocabularyCounts"];
+  private modelFacts: Record<string, unknown> | undefined;
+
+  /** The image's recommended switches, once: the record lists them every turn. */
+  private async readVocabulary(): Promise<void> {
+    if (!this.manifest.services?.vocabulary) return;
+    this.vocabularyReadAt = Date.now();
+    try {
+      const vocab = await this.client.engineVocabulary({ level: "mid", limit: 60 });
+      this.vocabularyStatus = vocab.status;
+      this.levers = (vocab.entries ?? []) as VocabEntry[];
+      if (vocab.model_facts && Object.keys(vocab.model_facts).length) this.modelFacts = vocab.model_facts;
+      if (vocab.status !== "none") {
+        const [flags, env] = await Promise.all([
+          this.client.engineVocabulary({ kind: "flag", limit: 1 }),
+          this.client.engineVocabulary({ kind: "env", limit: 1 }),
+        ]);
+        this.vocabularyCounts = { flags: flags.total ?? 0, env: env.total ?? 0, engineVersion: vocab.engine_version ?? "" };
+      }
+      this.log(`vocabulary: ${vocab.status}, ${this.levers.length} recommended switch(es)${this.modelFacts ? ", model facts read" : ""}`);
+    } catch (err) {
+      this.vocabularyStatus = "none";
+      this.log(`vocabulary read failed: ${(err as Error).message}`);
+    }
+  }
+
   recordContext(): RecordContext {
     const cards = this.lab.trials.map((t) => t.cards).sort((a, b) => a - b);
     const typical = cards.length ? cards[Math.floor(cards.length / 2)] : 1;
@@ -515,6 +551,10 @@ class Night {
       sessionId: this.manifest.session_id,
       tokensUsed: this.driver?.tokens,
       tokenLimit: this.settings.maxTokensPerNight || undefined,
+      levers: this.levers,
+      vocabularyStatus: this.vocabularyStatus,
+      vocabularyCounts: this.vocabularyCounts,
+      modelFacts: this.modelFacts,
     };
   }
 
