@@ -79,6 +79,28 @@ type DeclaredSpace = { grid?: Record<string, unknown[]>; tied?: Record<string, u
 
 /** Declared grid/tied values that no trial tonight has set (failed ones count
  *  as tried): "tp: 4; attention_backend: fa3". */
+/** The recipe every launch starts from (1.6): its chart, how many pods it
+ *  makes, and the chart values beyond flags and env, which the config's
+ *  `values.<path>` keys address. Empty when the platform sends none. */
+export function recipeLines(recipe: Record<string, unknown> | undefined): string[] {
+  const values = (recipe?.values ?? {}) as Record<string, unknown>;
+  if (!Object.keys(values).length) return [];
+  const chart = (recipe?.chart ?? {}) as { name?: string; version?: string };
+  const pd = (values.pd ?? {}) as Record<string, unknown>;
+  const lws = (values.lws ?? {}) as Record<string, unknown>;
+  const topology = pd.enabled
+    ? "pd: separate prefill and decode pods, each role with its own flags (`prefill.<flag>`, `decode.<flag>`)"
+    : lws.enabled
+      ? `lws: one engine over a group of ${lws.size ?? "?"} pods`
+      : "one pod";
+  const out = [`- Deployed as the ${chart.name ?? "engine"} chart${chart.version ? ` (${chart.version})` : ""}, ${topology}.`];
+  const rest = Object.fromEntries(
+    Object.entries(values).filter(([k]) => !["extraArgs", "env", "image", "model"].includes(k)),
+  );
+  if (Object.keys(rest).length) out.push(`- Its other chart values (set one as \`values.<dotted.path>\`): ${JSON.stringify(rest)}`);
+  return out;
+}
+
 export function untriedDeclared(space: unknown, trials: Trial[]): string[] {
   const s = (space ?? {}) as DeclaredSpace;
   const values = new Map<string, unknown[]>();
@@ -254,7 +276,8 @@ export function renderRecord(ctx: RecordContext): string {
   out.push(`- Model: ${manifest.model.served_model_name} on ${manifest.model.engine}, image ${manifest.model.image}`);
   const facts = factsText(ctx.modelFacts ?? (manifest.model as { facts?: Record<string, unknown> }).facts);
   out.push(facts ? `- What the model is (its config.json): ${facts}` : "- The model's config has not been read yet.");
-  out.push(`- Hardware: ${hw.machine} — ${hw.gpu_type || "unknown GPU"}, ${ctx.totalCards} card(s)${hw.pool ? ` (a pool of ${hw.node_count} node(s), at most ${hw.node_gpu_max || "?"} cards per launch)` : ""}, ${hw.ports?.length ?? 0} port(s)`);
+  out.push(`- Hardware: ${hw.machine} — ${hw.gpu_type || "unknown GPU"}, ${ctx.totalCards} card(s)${hw.pool ? ` (a pool of ${hw.node_count} node(s), at most ${hw.node_gpu_max || "?"} cards per pod)` : ""}, ${hw.ports?.length ?? 0} port(s)`);
+  out.push(...recipeLines((manifest.model as { recipe?: Record<string, unknown> }).recipe));
   out.push(...timeLines(manifest.time, b.minutesLeft, ctx.nowMs ?? Date.now()));
   out.push(`- One trial takes ~${fmt(b.perTrial, 0)} min (launch to release); up to ${b.parallel} at once → room for about ${b.trialsLeft ?? "?"} more trial(s)`);
   out.push(`- Now: ${cardsNow(ctx.totalCards, ctx.freeCards, ctx.running)}, ${lab.trials.filter((t) => t.status === "queued").length} queued. Trials may use different card counts side by side; a queued one starts when enough cards are free.`);
@@ -289,6 +312,7 @@ export function renderRecord(ctx: RecordContext): string {
   out.push(`- Forbidden parameters (keep the campaign's value; never change): ${ctx.forbidden.length ? ctx.forbidden.join(", ") : "none"}`);
   out.push("- Every value must be a string, number or boolean that survives the engine command line and back (no lists/objects; JSON flags as one JSON string). Never set placement (model_path, host, port, …).");
   if (manifest.services?.env_keys) out.push("- An environment variable is set as an `env.NAME` key (`\"env.SGLANG_FOO\": true`). A name the image does not read is refused: look it up with `engine_vocab` first.");
+  if (manifest.services?.recipes) out.push("- Besides flags and `env.NAME`, a key may set a pd role's flag (`prefill.mem_fraction_static`, `decode.max_running_requests`) or a chart value (`values.shm.sizeLimit`); `null` removes one. Scheduling, routing, scaling, names, the image and how many pods each role runs are the platform's, and refused. `check` shows the pods and each role's command the platform builds.");
   out.push("- Use `check` before proposing anything unusual; it costs nothing.");
 
   if (ctx.vocabularyStatus !== undefined) {

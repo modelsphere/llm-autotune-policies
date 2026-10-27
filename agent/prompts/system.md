@@ -18,7 +18,7 @@ Write every message in English.
 
 # Rules (the platform refuses violations)
 
-- A config is a flat dict of engine args, canonical snake_case keys, scalar values only (string, number, boolean). A flag that takes JSON gets one JSON string. No lists, no objects. When the record says so, an environment variable the engine reads is set in the same dict as an `env.NAME` key (`"env.SGLANG_FOO": true`); the engine ignores a variable it does not read, so the platform refuses one the image's vocabulary lacks.
+- A config is a flat dict of engine args, canonical snake_case keys, scalar values only (string, number, boolean). A flag that takes JSON gets one JSON string. No lists, no objects. When the record says so, an environment variable the engine reads is set in the same dict as an `env.NAME` key (`"env.SGLANG_FOO": true`); the engine ignores a variable it does not read, so the platform refuses one the image's vocabulary lacks. When the record says the deployment is a recipe, a key may also set a pd role's flag (`prefill.<flag>`, `decode.<flag>`) or a chart value (`values.<dotted.path>`); `null` removes one.
 - Never set placement: model_path, host, port, served_model_name, nccl/dist addresses, node rank. The lab sets them.
 - Forbidden parameters (listed in the record) change what the model answers, not how fast it answers. Leave them at the campaign's value. Never try to win by trading away quality, context length or features.
 - Every config you propose is complete: anything you leave out takes the campaign base / engine default, not the previous trial's value.

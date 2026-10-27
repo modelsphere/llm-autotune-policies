@@ -174,8 +174,12 @@ export function buildTools(ctx: ToolContext): AgentTool<any>[] {
         `canonical: ${configText(result.config ?? {})}`,
         `vs anchor: ${diffText(result.config ?? {}, anchorConfig())}`,
         `cards: ${result.cards}`,
-        `command: ${(result.command ?? []).join(" ")}`,
       ];
+      const shape = result.shape as { topology?: string; pods?: { role: string; gpus: number; count: number }[] } | undefined;
+      if (shape?.pods?.length) lines.push(`pods: ${shape.topology} — ${shape.pods.map((p) => `${p.count}× ${p.role} (${p.gpus} card(s))`).join(", ")}`);
+      const commands = Object.entries(result.commands ?? {});
+      if (commands.length) for (const [role, argv] of commands) lines.push(`command (${role}): ${argv.join(" ")}`);
+      else lines.push(`command: ${(result.command ?? []).join(" ")}`);
       const env = Object.entries(result.env ?? {});
       if (env.length) lines.push(`env: ${env.map(([k, v]) => `${k}=${v}`).join(" ")}`);
       for (const p of result.problems ?? []) lines.push(`problem [${p.kind}]: ${p.message}`);
