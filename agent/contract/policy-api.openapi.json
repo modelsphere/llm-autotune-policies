@@ -172,6 +172,16 @@
             "title": "Command",
             "type": "array"
           },
+          "commands": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Commands",
+            "type": "object"
+          },
           "config": {
             "additionalProperties": true,
             "title": "Config",
@@ -202,6 +212,16 @@
             },
             "title": "Problems",
             "type": "array"
+          },
+          "recipe": {
+            "additionalProperties": true,
+            "title": "Recipe",
+            "type": "object"
+          },
+          "shape": {
+            "additionalProperties": true,
+            "title": "Shape",
+            "type": "object"
           },
           "warnings": {
             "items": {
@@ -1266,6 +1286,11 @@
             "title": "Model Path",
             "type": "string"
           },
+          "recipe": {
+            "additionalProperties": true,
+            "title": "Recipe",
+            "type": "object"
+          },
           "served_model_name": {
             "title": "Served Model Name",
             "type": "string"
@@ -1333,6 +1358,11 @@
           "launch": {
             "default": true,
             "title": "Launch",
+            "type": "boolean"
+          },
+          "recipes": {
+            "default": false,
+            "title": "Recipes",
             "type": "boolean"
           },
           "state": {

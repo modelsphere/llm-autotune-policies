@@ -516,6 +516,10 @@ export interface components {
             cards: number;
             /** Command */
             command?: string[];
+            /** Commands */
+            commands?: {
+                [key: string]: string[];
+            };
             /** Config */
             config?: {
                 [key: string]: unknown;
@@ -532,6 +536,14 @@ export interface components {
             ok: boolean;
             /** Problems */
             problems?: components["schemas"]["ConfigProblem"][];
+            /** Recipe */
+            recipe?: {
+                [key: string]: unknown;
+            };
+            /** Shape */
+            shape?: {
+                [key: string]: unknown;
+            };
             /** Warnings */
             warnings?: string[];
         };
@@ -1015,6 +1027,10 @@ export interface components {
             image: string;
             /** Model Path */
             model_path: string;
+            /** Recipe */
+            recipe?: {
+                [key: string]: unknown;
+            };
             /** Served Model Name */
             served_model_name: string;
         };
@@ -1055,6 +1071,11 @@ export interface components {
              * @default true
              */
             launch: boolean;
+            /**
+             * Recipes
+             * @default false
+             */
+            recipes: boolean;
             /**
              * State
              * @default true
