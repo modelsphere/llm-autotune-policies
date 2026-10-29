@@ -54,7 +54,10 @@ about the protocol.
 ghcr.io/modelsphere/llm-autotune-policy-random-search:0.1.1
 ```
 
-If your GPU nodes can pull from ghcr.io, register that image and skip the
+From the next release on it is also on Docker Hub, as
+`docker.io/4pdosc/llm-autotune-policy-random-search:<version>`.
+
+If your GPU nodes can pull from one of them, register that image and skip the
 build. If they can't, copy it into a registry they can reach
 (`docker pull`, `docker tag`, `docker push`), or build it as below.
 
