@@ -400,8 +400,11 @@ class Night {
   }
 
   private async queueAnchor(): Promise<void> {
-    const production = ((this.manifest.production as { engine_args?: Config } | undefined)?.engine_args ?? {}) as Config;
-    for (const candidate of [production, {}]) {
+    // 1.7: the platform names the config that launches production (`{}` when
+    // it is the campaign's recipe as written); before, the recorded args were it.
+    const production = (this.manifest.production ?? {}) as { config?: Config; engine_args?: Config };
+    const first = (production.config ?? production.engine_args ?? {}) as Config;
+    for (const candidate of Object.keys(first).length ? [first, {}] : [{}]) {
       const check = await this.client.checkConfig(candidate);
       if (check.ok) {
         // Twice, side by side when the budget allows: the two give the noise

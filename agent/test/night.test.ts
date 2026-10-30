@@ -271,3 +271,35 @@ test("an agent that goes quiet does not leave the cards idle or end the search",
     await platform.stop();
   }
 });
+
+test("production built by the platform from the recipe: launched by its config, shown whole", async () => {
+  // 1.7: the platform sends every flag production runs and the config that
+  // launches it — {} when it is the recipe as written. The anchor sends {},
+  // never the flags back, and the record shows what the anchor runs.
+  const platform = new FakePlatform({
+    space: { grid: { mem_fraction_static: [0.85, 0.9] } },
+    productionManifest: {
+      engine_args: { tp: 1, mem_fraction_static: 0.83, chunked_prefill_size: 8192 },
+      env: { PYTORCH_ALLOC_CONF: "expandable_segments:True" },
+      image: "lmsysorg/sglang:v0.5.22",
+      config: {},
+      source: "recipe",
+      launch_command: "",
+    },
+    params: { allow_early_done: true },
+  });
+  await platform.start();
+  try {
+    const scripted = scriptedModel();
+    const code = await runNight({ env: platform.env, model: scripted, log: () => {}, tickMs: 10 });
+    assert.equal(code, 0);
+    const [first] = [...platform.launches.values()];
+    assert.deepEqual(first.config, {}, "the anchor is production's config, not its flags");
+    const record = scripted.seen.find((r) => r.includes("## Production (the anchor)")) ?? "";
+    assert.ok(record.includes("Production config (the campaign's recipe as written): chunked_prefill_size=8192 mem_fraction_static=0.83 tp=1"), record.slice(0, 400));
+    assert.ok(record.includes("Production env: PYTORCH_ALLOC_CONF=expandable_segments:True"));
+    assert.ok(record.includes("Production image: lmsysorg/sglang:v0.5.22"));
+  } finally {
+    await platform.stop();
+  }
+});
