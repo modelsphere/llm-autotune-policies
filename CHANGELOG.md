@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- The random-search image is also published to Docker Hub, as
+  `4pdosc/llm-autotune-policy-random-search:<version>`, beside ghcr.io: the
+  ModelSphere stack takes every image of ours from one registry prefix.
 - `agent`: files a digest of each night for other campaigns (platform
   contract 1.4). Once the search is over, while the platform validates, the
   model writes what the night established: the effects that held, what failed
