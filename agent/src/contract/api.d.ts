@@ -1045,6 +1045,40 @@ export interface components {
             /** Target Metric */
             target_metric: string;
         };
+        /**
+         * ManifestProduction
+         * @description Production: what serves today, as the platform launches it when it
+         *     measures production next to the contenders.
+         */
+        ManifestProduction: {
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            };
+            /** Engine Args */
+            engine_args?: {
+                [key: string]: unknown;
+            };
+            /** Env */
+            env?: {
+                [key: string]: string;
+            };
+            /**
+             * Image
+             * @default
+             */
+            image: string;
+            /**
+             * Launch Command
+             * @default
+             */
+            launch_command: string;
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+        };
         /** ManifestServices */
         ManifestServices: {
             /** Benchmarks */
@@ -1071,6 +1105,11 @@ export interface components {
              * @default true
              */
             launch: boolean;
+            /**
+             * Production Config
+             * @default false
+             */
+            production_config: boolean;
             /**
              * Recipes
              * @default false
@@ -1383,10 +1422,7 @@ export interface components {
             prior?: {
                 [key: string]: unknown;
             };
-            /** Production */
-            production?: {
-                [key: string]: unknown;
-            };
+            production?: components["schemas"]["ManifestProduction"];
             /** Search Space */
             search_space: {
                 [key: string]: unknown;

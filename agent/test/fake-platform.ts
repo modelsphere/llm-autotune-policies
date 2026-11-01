@@ -10,6 +10,8 @@ type Config = Record<string, unknown>;
 export interface FakeOptions {
   space?: Record<string, unknown>;
   production?: Config;
+  /** The manifest's whole `production` (1.7), in place of one built from `production`. */
+  productionManifest?: Record<string, unknown>;
   forbidden?: string[];
   cards?: number;
   ports?: number;
@@ -158,7 +160,7 @@ export class FakePlatform {
       },
       search_space: this.opts.space ?? {},
       space_policy: { deviations: "allowed_if_declared", forbidden: this.opts.forbidden ?? ["quantization*"] },
-      production: { engine_args: this.opts.production ?? {}, launch_command: "" },
+      production: this.opts.productionManifest ?? { engine_args: this.opts.production ?? {}, launch_command: "" },
       time: {
         started_at: new Date(now).toISOString(),
         search_deadline: new Date(now + (this.opts.searchMinutes ?? 120) * 60000).toISOString(),

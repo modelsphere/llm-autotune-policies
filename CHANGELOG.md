@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- `agent`: production comes from the platform (contract 1.7). The anchor
+  launches the config the platform names as production — `{}` when production
+  is the campaign's recipe as written — and the lab record shows every flag,
+  the env and the image production runs, and where it came from (a recorded
+  reference or the recipe). The agent no longer has to dig the starting
+  config out of the recipe. On a 1.6 platform it anchors on the recorded args
+  as before.
+
 ### Added
 - `agent`: files a digest of each night for other campaigns (platform
   contract 1.4). Once the search is over, while the platform validates, the

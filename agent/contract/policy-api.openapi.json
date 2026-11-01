@@ -1331,6 +1331,45 @@
         "title": "ManifestObjective",
         "type": "object"
       },
+      "ManifestProduction": {
+        "description": "Production: what serves today, as the platform launches it when it\nmeasures production next to the contenders.",
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "engine_args": {
+            "additionalProperties": true,
+            "title": "Engine Args",
+            "type": "object"
+          },
+          "env": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Env",
+            "type": "object"
+          },
+          "image": {
+            "default": "",
+            "title": "Image",
+            "type": "string"
+          },
+          "launch_command": {
+            "default": "",
+            "title": "Launch Command",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "title": "ManifestProduction",
+        "type": "object"
+      },
       "ManifestServices": {
         "properties": {
           "benchmarks": {
@@ -1358,6 +1397,11 @@
           "launch": {
             "default": true,
             "title": "Launch",
+            "type": "boolean"
+          },
+          "production_config": {
+            "default": false,
+            "title": "Production Config",
             "type": "boolean"
           },
           "recipes": {
@@ -2088,9 +2132,7 @@
             "type": "object"
           },
           "production": {
-            "additionalProperties": true,
-            "title": "Production",
-            "type": "object"
+            "$ref": "#/components/schemas/ManifestProduction"
           },
           "search_space": {
             "additionalProperties": true,

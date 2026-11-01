@@ -332,8 +332,26 @@ export function renderRecord(ctx: RecordContext): string {
   }
 
   out.push("\n## Production (the anchor)");
-  const production = (manifest.production as { engine_args?: Record<string, unknown> } | undefined)?.engine_args;
-  out.push(`- Production config: ${production && Object.keys(production).length ? configText(production) : "(none recorded; the anchor is the campaign's base config)"}`);
+  const production = (manifest.production ?? {}) as {
+    engine_args?: Record<string, unknown>;
+    env?: Record<string, string>;
+    image?: string;
+    source?: string;
+  };
+  const productionArgs = production.engine_args ?? {};
+  const from = ({
+    baselines: "recorded on Baselines, applied over the campaign's recipe",
+    recipe: "the campaign's recipe as written",
+    campaign: "the campaign's own settings",
+  } as Record<string, string>)[production.source ?? ""];
+  if (Object.keys(productionArgs).length) {
+    out.push(`- Production config${from ? ` (${from})` : ""}: ${configText(productionArgs)}`);
+    if (Object.keys(production.env ?? {}).length) out.push(`- Production env: ${configText(production.env ?? {})}`);
+    if (production.image) out.push(`- Production image: ${production.image}`);
+    out.push("- Every trial below is written as its changes to the anchor, which launches exactly this.");
+  } else {
+    out.push("- Production config: (none recorded; the anchor is the campaign's base config)");
+  }
   out.push(`- Anchor measurement: ${anchor ? (anchorValue !== null ? fmt(anchorValue) : anchor.status) : "not started"}`);
   const declared = manifest.search_space ?? {};
   if (Object.keys(declared).length) {

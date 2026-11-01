@@ -24,4 +24,4 @@ export type VocabularyOut = Schemas["VocabularyOut"];
 /** A flat dict of engine args in the platform's canonical spelling. */
 export type Config = Record<string, unknown>;
 
-export const CONTRACT_VERSION = "1.6";
+export const CONTRACT_VERSION = "1.7";
