@@ -92,10 +92,12 @@ jobs:
   image:
     # Each policy vendors the SDK, so its own directory is the build context.
     # Built on every push so a broken Dockerfile is caught in review. On a
-    # version tag, random-search is also published to ghcr.io for amd64 and
-    # arm64, so an install can register it without building anything; any
-    # policy still builds from source for a registry of your own (README.md,
-    # "Building an image").
+    # version tag, random-search is also published for amd64 and arm64, to
+    # ghcr.io and to Docker Hub under 4pdosc (where the ModelSphere stack takes
+    # every image of ours from), so an install can register it without building
+    # anything; any policy still builds from source for a registry of your own
+    # (README.md, "Building an image"). Docker Hub credentials are the org
+    # secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN.
     runs-on: ubuntu-latest
     needs: [sdk-copies-match, test, agent]
     permissions:
@@ -107,6 +109,7 @@ jobs:
     env:
       PUBLISH: ${{ startsWith(github.ref, 'refs/tags/v') && matrix.policy == 'random-search' }}
       IMAGE: ghcr.io/${{ github.repository_owner }}/llm-autotune-policy-${{ matrix.policy }}
+      HUB_IMAGE: docker.io/4pdosc/llm-autotune-policy-${{ matrix.policy }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -132,6 +135,11 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        if: env.PUBLISH == 'true'
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ${{ matrix.policy }}
@@ -139,7 +147,7 @@ jobs:
           platforms: ${{ env.PUBLISH == 'true' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           # A version tag only, never `latest`: a campaign must re-run the same
           # search, and nodes keep the image they already have.
-          tags: ${{ env.PUBLISH == 'true' && format('{0}:{1}', env.IMAGE, steps.version.outputs.version) || format('llm-autotune-policy-{0}:ci', matrix.policy) }}
+          tags: ${{ env.PUBLISH == 'true' && format('{0}:{1},{2}:{1}', env.IMAGE, steps.version.outputs.version, env.HUB_IMAGE) || format('llm-autotune-policy-{0}:ci', matrix.policy) }}
           # The source label links the package to this repository on ghcr.io.
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
